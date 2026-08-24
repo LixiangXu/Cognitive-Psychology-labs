@@ -89,7 +89,10 @@ psychoJS.start({
     // resources:
     {'name': 'conditions_B.xlsx', 'path': 'conditions_B.xlsx'},
     {'name': 'conditions_C.xlsx', 'path': 'conditions_C.xlsx'},
-  ]
+  ],
+  resp: {
+    downloadData: true  // <-- ADD THIS LINE
+  }
 });
 
 psychoJS.experimentLogger.setLevel(core.Logger.ServerLevel.INFO);
