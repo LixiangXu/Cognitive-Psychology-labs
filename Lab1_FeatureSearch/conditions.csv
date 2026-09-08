@@ -1,0 +1,17 @@
+﻿condition,set_size,target_present,corrAns
+feature,4,1,m
+feature,4,0,z
+feature,8,1,m
+feature,8,0,z
+feature,16,1,m
+feature,16,0,z
+feature,24,1,m
+feature,24,0,z
+conjunction,4,1,m
+conjunction,4,0,z
+conjunction,8,1,m
+conjunction,8,0,z
+conjunction,16,1,m
+conjunction,16,0,z
+conjunction,24,1,m
+conjunction,24,0,z
