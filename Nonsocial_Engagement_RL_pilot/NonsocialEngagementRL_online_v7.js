@@ -96,7 +96,7 @@ psychoJS.start({
     // resources:
     {'name': 'instruction.csv', 'path': 'instruction.csv'},
     {'name': 'questionnaires.csv', 'path': 'questionnaires.csv'},
-    {'name': 'conditions_v4_80_trials_6_chunks.csv', 'path': 'conditions_v4_80_trials_6_chunks.csv'},
+    {'name': 'conditions_v7_80_trials_6_chunks.csv', 'path': 'conditions_v7_80_trials_6_chunks.csv'},
     {'name': 'fractals/7.jpg', 'path': 'fractals/7.jpg'},
     {'name': 'fractals/6.jpg', 'path': 'fractals/6.jpg'},
     {'name': 'questionnaires.csv', 'path': 'questionnaires.csv'},
@@ -810,7 +810,7 @@ function trialsLoopBegin(trialsLoopScheduler, snapshot) {
       psychoJS: psychoJS,
       nReps: 1, method: TrialHandler.Method.SEQUENTIAL,
       extraInfo: expInfo, originPath: undefined,
-      trialList: 'conditions_v4_80_trials_6_chunks.csv',
+      trialList: 'conditions_v7_80_trials_6_chunks.csv',
       seed: undefined, name: 'trials'
     });
     psychoJS.experiment.addLoop(trials); // add the loop to the experiment
@@ -1930,6 +1930,7 @@ function outcome_page_barRoutineBegin(snapshot) {
       var bar_width = 0.8;
       outcome_arrow.opacity = 1.0
       outcome_percent.opacity = 1.0
+      label50.opacity = 1.0
       
       if (choice_timeout) {
           outcome_bar_headline.setText("No response detected. This trial does not count.");
@@ -1940,6 +1941,9 @@ function outcome_page_barRoutineBegin(snapshot) {
           outcome_bar_headline.setText("The chance you will write about your personal experience:");
           target_x = bar_left + (outcome_choice / 100.0) * bar_width;
           target_text = Math.round(outcome_choice).toString() + " %";
+          if (outcome_choice >= 40 && outcome_choice <= 60){
+              label50.opacity = 0.0;
+          }
       }
       
       outcome_percent.setPos([target_x, (- 0.22)]);
