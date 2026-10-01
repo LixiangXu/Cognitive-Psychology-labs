@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 4: Generation Effect</title>
+<style>
+  :root {
+    --bg: #7F7F7F;
+    --fg: #FFFFFF;
+    --fg-dim: #F0F0F0;
+    --input-bg: #6E6E6E;
+    --accent: #FFFFFF;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--fg);
+    font-family: Arial, Helvetica, "Helvetica Neue", system-ui, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  .screen {
+    display: none; width: 100%; max-width: 900px; padding: 24px 16px;
+    text-align: center;
+  }
+  .screen.active { display: block; }
+  h1 { font-size: 32px; font-weight: normal; margin: 0 0 24px; }
+  p, li { font-size: 20px; line-height: 1.5; color: var(--fg-dim); }
+  .instr { text-align: left; max-width: 720px; margin: 0 auto; }
+  .stim { font-size: 48px; letter-spacing: 0.04em; margin: 0 0 32px; white-space: nowrap; }
+  .fixation { font-size: 56px; }
+  .hint { font-size: 16px; color: var(--fg-dim); opacity: 0.8; margin-top: 20px; }
+  .timer { position: fixed; top: 16px; right: 20px; font-size: 18px; color: var(--fg-dim); }
+  input[type=text] {
+    font: inherit; font-size: 28px; text-align: center;
+    width: 320px; max-width: 90%; padding: 10px 12px;
+    background: var(--input-bg); color: var(--fg);
+    border: 2px solid var(--fg-dim); border-radius: 4px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--accent); }
+  button {
+    font: inherit; font-size: 20px; padding: 12px 32px; margin-top: 28px;
+    background: transparent; color: var(--fg); border: 2px solid var(--fg);
+    border-radius: 4px; cursor: pointer;
+  }
+  button:hover { background: rgba(255,255,255,0.12); }
+  button.primary { background: var(--fg); color: #4A4A4A; font-weight: bold; }
+  button.primary:hover { background: var(--fg-dim); }
+  label { display: block; font-size: 20px; margin-bottom: 12px; color: var(--fg-dim); }
+  .error { color: #FFE0E0; font-size: 16px; min-height: 22px; margin-top: 10px; }
+  table { margin: 0 auto; border-collapse: collapse; font-size: 20px; }
+  th, td { padding: 10px 22px; border-bottom: 1px solid rgba(255,255,255,0.35); }
+  th { font-weight: normal; color: var(--fg-dim); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.lbl { text-align: left; }
+  table.grid { border-collapse: separate; border-spacing: 8px; }
+  table.grid th, table.grid td { border: none; }
+  table.grid th { padding: 6px 12px; }
+  table.grid th.row { text-align: right; padding-right: 16px; }
+  table.grid td.cell {
+    width: 150px; height: 100px; padding: 10px;
+    border: 2px solid rgba(255,255,255,0.6); border-radius: 4px;
+  }
+  .cell .pct { display: block; font-size: 36px; color: var(--fg); }
+  #s-end { max-width: 1100px; }
+  .grids { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 32px; }
+  .grid-title { margin: 0 0 4px; font-size: 18px; }
+  .cell .cnt { display: block; font-size: 16px; color: var(--fg-dim); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- 1. Welcome / ID -->
+<div id="s-welcome" class="screen active">
+  <h1>Memory Experiment</h1>
+  <label for="pid">Participant ID / Student ID</label>
+  <input type="text" id="pid" autocomplete="off" spellcheck="false">
+  <div class="error" id="pid-err"></div>
+  <button class="primary" id="btn-start">Start</button>
+</div>
+
+<!-- 2. Instructions: Encoding -->
+<div id="s-instr1" class="screen">
+  <h1>Phase 1: Study</h1>
+  <div class="instr">
+    <p>You will see pairs of words. For some, you will simply <b>read</b> the full pair
+       (e.g., <b>FAST - SLOW</b>). These will disappear on their own after a few seconds.</p>
+    <p>For others, you will see a word and a word fragment (e.g., <b>FAST - S___</b>).
+       Type the completed word and press <b>ENTER</b>. Each underscore stands for one missing letter.</p>
+    <p>Pay attention to every pair. Your memory will be tested later.</p>
+  </div>
+  <p class="hint">Press SPACE to continue</p>
+</div>
+
+<!-- 2b. Instructions: how to complete a fragment -->
+<div id="s-instr1b" class="screen">
+  <h1>Completing Word Fragments</h1>
+  <div class="instr">
+    <p>The fragment always shows the <b>first letter</b> of the word you need to produce.
+       Type the <b>whole word, including that first letter</b>.</p>
+  </div>
+  <div class="stim" style="margin-top:28px;">FAST - S___</div>
+  <div class="instr">
+    <p>Correct: type <b>SLOW</b> and press ENTER.<br>
+       Incorrect: typing only <b>LOW</b> (do not leave out the first letter).</p>
+    <p>Upper- or lower-case letters are both fine.</p>
+  </div>
+  <p class="hint">Press SPACE to begin Phase 1</p>
+</div>
+
+<!-- 3. Encoding trials -->
+<div id="s-encode" class="screen">
+  <div class="stim" id="enc-stim"></div>
+  <div id="enc-input-wrap">
+    <input type="text" id="enc-input" autocomplete="off" spellcheck="false" autocapitalize="characters">
+    <div class="hint">Type the word and press ENTER</div>
+  </div>
+</div>
+
+<!-- 4a. Distractor instructions -->
+<div id="s-instr-math" class="screen">
+  <h1>Phase 2: Math</h1>
+  <div class="instr">
+    <p>Complete as many math problems as you can in 2 minutes.</p>
+    <p>Type your answer and press <b>ENTER</b> to move to the next problem.
+       The task will end automatically when time runs out.</p>
+  </div>
+  <p class="hint">Press SPACE to begin</p>
+</div>
+
+<!-- 4b. Distractor task -->
+<div id="s-math" class="screen">
+  <div class="timer" id="math-timer"></div>
+  <div class="stim" id="math-stim"></div>
+  <input type="text" id="math-input" autocomplete="off" inputmode="numeric">
+</div>
+
+<!-- 5. Instructions: Test -->
+<div id="s-instr2" class="screen">
+  <h1>Phase 3: Memory Test</h1>
+  <div class="instr">
+    <p>You will now see a cue word. Type the <b>TARGET</b> word that was paired with or
+       generated from this concept in Phase 1.</p>
+    <p>Some cue words are the exact words you saw in Phase 1; others are different words
+       with a similar meaning. Press <b>ENTER</b> to submit. If you cannot remember, make your
+       best guess or press ENTER to skip.</p>
+  </div>
+  <p class="hint">Press SPACE to begin</p>
+</div>
+
+<!-- 6. Test trials -->
+<div id="s-test" class="screen">
+  <div class="stim" id="test-stim"></div>
+  <input type="text" id="test-input" autocomplete="off" spellcheck="false" autocapitalize="characters">
+  <div class="hint">Type the target word and press ENTER</div>
+</div>
+
+<!-- Fixation (shared) -->
+<div id="s-fix" class="screen"><div class="stim fixation">+</div></div>
+
+<!-- 7. End -->
+<div id="s-end" class="screen">
+  <h1>Thank you! The experiment is complete.</h1>
+  <p>Participant: <b id="end-pid"></b></p>
+  <div class="grids">
+    <div>
+      <p class="grid-title">Standard Target Accuracy</p>
+      <table class="grid">
+        <thead><tr><th></th><th>Original Cue</th><th>Novel Cue</th></tr></thead>
+        <tbody id="end-table"></tbody>
+      </table>
+    </div>
+    <div>
+      <p class="grid-title">Self-Generated Recall Accuracy</p>
+      <table class="grid">
+        <thead><tr><th></th><th>Original Cue</th><th>Novel Cue</th></tr></thead>
+        <tbody id="end-table-self"></tbody>
+      </table>
+    </div>
+  </div>
+  <p class="hint" id="dl-status"></p>
+  <button class="primary" id="btn-download">Download Data (CSV)</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Stimuli: 40 items. Original cue (shown at study), novel cue
+  // (synonym of the original cue, never shown at study), and target.
+  // Mirrors conditions.csv in this folder.
+  // ---------------------------------------------------------------
+  const STIMULI = [
+    { cue: "FAST",     novel: "QUICK",      target: "SLOW"   },
+    { cue: "HOT",      novel: "WARM",       target: "COLD"   },
+    { cue: "BIG",      novel: "LARGE",      target: "SMALL"  },
+    { cue: "HAPPY",    novel: "GLAD",       target: "SAD"    },
+    { cue: "RICH",     novel: "WEALTHY",    target: "POOR"   },
+    { cue: "STRONG",   novel: "POWERFUL",   target: "WEAK"   },
+    { cue: "BEGIN",    novel: "START",      target: "END"    },
+    { cue: "BRAVE",    novel: "FEARLESS",   target: "COWARD" },
+    { cue: "DOCTOR",   novel: "PHYSICIAN",  target: "NURSE"  },
+    { cue: "OCEAN",    novel: "SEA",        target: "WAVE"   },
+    { cue: "CAR",      novel: "AUTOMOBILE", target: "ROAD"   },
+    { cue: "HOUSE",    novel: "HOME",       target: "ROOF"   },
+    { cue: "BOAT",     novel: "SHIP",       target: "SAIL"   },
+    { cue: "FOREST",   novel: "WOODS",      target: "TREE"   },
+    { cue: "CASH",     novel: "MONEY",      target: "BANK"   },
+    { cue: "SOFA",     novel: "COUCH",      target: "PILLOW" },
+    { cue: "PATH",     novel: "TRAIL",      target: "HIKE"   },
+    { cue: "SMART",    novel: "CLEVER",     target: "BRAIN"  },
+    { cue: "ANGRY",    novel: "FURIOUS",    target: "CALM"   },
+    { cue: "LOUD",     novel: "NOISY",      target: "QUIET"  },
+    { cue: "SHUT",     novel: "CLOSE",      target: "OPEN"   },
+    { cue: "GIFT",     novel: "PRESENT",    target: "WRAP"   },
+    { cue: "INFANT",   novel: "BABY",       target: "CRIB"   },
+    { cue: "STORE",    novel: "SHOP",       target: "BUY"    },
+    { cue: "JOB",      novel: "WORK",       target: "BOSS"   },
+    { cue: "TALK",     novel: "SPEAK",      target: "LISTEN" },
+    { cue: "BUCKET",   novel: "PAIL",       target: "WATER"  },
+    { cue: "MOUNTAIN", novel: "PEAK",       target: "CLIMB"  },
+    { cue: "KING",     novel: "MONARCH",    target: "QUEEN"  },
+    { cue: "CHILD",    novel: "KID",        target: "TOY"    },
+    { cue: "FIELD",    novel: "MEADOW",     target: "GRASS"  },
+    { cue: "DINNER",   novel: "SUPPER",     target: "PLATE"  },
+    { cue: "LAWYER",   novel: "ATTORNEY",   target: "COURT"  },
+    { cue: "STOMACH",  novel: "BELLY",      target: "HUNGRY" },
+    { cue: "CAP",      novel: "HAT",        target: "HEAD"   },
+    { cue: "PICTURE",  novel: "PHOTO",      target: "CAMERA" },
+    { cue: "CHAIR",    novel: "SEAT",       target: "TABLE"  },
+    { cue: "STREAM",   novel: "CREEK",      target: "FISH"   },
+    { cue: "AUTUMN",   novel: "FALL",       target: "LEAF"   },
+    { cue: "CUP",      novel: "MUG",        target: "COFFEE" }
+  ];
+
+  // Timing (ms). Add ?debug=1 to the URL for a fast run-through.
+  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+  const READ_MS       = DEBUG ? 300   : 3000;
+  const FIXATION_MS   = DEBUG ? 100   : 500;
+  const DISTRACTOR_MS = DEBUG ? 10000 : 120000;
+
+  const CONDITIONS = [
+    { enc: "Read",     cue: "Original" },
+    { enc: "Read",     cue: "Novel"    },
+    { enc: "Generate", cue: "Original" },
+    { enc: "Generate", cue: "Novel"    }
+  ];
+
+  // ---------------- helpers ----------------
+  const $ = (id) => document.getElementById(id);
+  const now = () => performance.now();
+  const norm = (s) => String(s).trim().toLowerCase();
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+  }
+
+  function fragment(word) {
+    return word[0] + "_".repeat(word.length - 1);
+  }
+
+  function waitForSpace() {
+    return new Promise((resolve) => {
+      function onKey(e) {
+        if (e.code === "Space" || e.key === " ") {
+          e.preventDefault();
+          document.removeEventListener("keydown", onKey);
+          resolve();
+        }
+      }
+      document.addEventListener("keydown", onKey);
+    });
+  }
+
+  // Resolves with {text, rt} when ENTER is pressed. RT is measured from `t0`.
+  function waitForEnter(input, t0, allowEmpty) {
+    return new Promise((resolve) => {
+      input.value = "";
+      input.focus();
+      function onKey(e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!allowEmpty && text === "") return;
+        const rt = Math.round(now() - t0);
+        input.removeEventListener("keydown", onKey);
+        resolve({ text, rt });
+      }
+      input.addEventListener("keydown", onKey);
+    });
+  }
+
+  async function fixation() {
+    show("s-fix");
+    await wait(FIXATION_MS);
+  }
+
+  // Keep focus in the active text box if the participant clicks elsewhere.
+  document.addEventListener("mousedown", (e) => {
+    const active = document.querySelector(".screen.active input[type=text]");
+    if (active && e.target.tagName !== "INPUT" && e.target.tagName !== "BUTTON") {
+      e.preventDefault();
+      active.focus();
+    }
+  });
+
+  // ---------------- state ----------------
+  let participantId = "";
+  let items = [];          // 40 items with assigned condition
+  const encodingData = [];
+  const testData = [];
+  let mathSolved = 0, mathCorrect = 0;
+
+  function assignConditions() {
+    // Randomly assign 10 items to each of the 4 cells.
+    return shuffle(STIMULI).map((s, i) => {
+      const c = CONDITIONS[Math.floor(i / 10)];
+      return {
+        encoding_cue: s.cue,
+        novel_cue: s.novel,
+        target: s.target,
+        encoding_mode: c.enc,
+        retrieval_cue_type: c.cue
+      };
+    });
+  }
+
+  // ---------------- Phase 1: Encoding ----------------
+  async function runEncoding() {
+    const order = shuffle(items);
+    const inputWrap = $("enc-input-wrap");
+    const input = $("enc-input");
+
+    for (let i = 0; i < order.length; i++) {
+      const it = order[i];
+      await fixation();
+      show("s-encode");
+
+      if (it.encoding_mode === "Read") {
+        $("enc-stim").textContent = it.encoding_cue + " - " + it.target;
+        inputWrap.style.visibility = "hidden";
+        await wait(READ_MS);
+        encodingData.push({ trial: i + 1, it, response: "", correct: "", rt: "" });
+      } else {
+        $("enc-stim").textContent = it.encoding_cue + " - " + fragment(it.target);
+        inputWrap.style.visibility = "visible";
+        const t0 = now();
+        const r = await waitForEnter(input, t0, false);
+        encodingData.push({
+          trial: i + 1, it, response: r.text,
+          correct: norm(r.text) === norm(it.target) ? 1 : 0, rt: r.rt
+        });
+        input.blur();
+      }
+    }
+  }
+
+  // ---------------- Phase 2: Distractor ----------------
+  function makeProblem() {
+    const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+    if (Math.random() < 0.5) {
+      const a = rnd(2, 19), b = rnd(2, 19);
+      return { text: a + " + " + b + " = ?", answer: a + b };
+    }
+    const a = rnd(6, 25), b = rnd(2, a - 1);
+    return { text: a + " - " + b + " = ?", answer: a - b };
+  }
+
+  function runDistractor() {
+    return new Promise((resolve) => {
+      show("s-math");
+      const input = $("math-input");
+      const stim = $("math-stim");
+      const timerEl = $("math-timer");
+      const tEnd = now() + DISTRACTOR_MS;
+      let prob = makeProblem();
+      stim.textContent = prob.text;
+      const totalSec = Math.ceil(DISTRACTOR_MS / 1000);
+      timerEl.textContent = Math.floor(totalSec / 60) + ":" + String(totalSec % 60).padStart(2, "0");
+      input.value = "";
+      input.focus();
+
+      function onKey(e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const v = input.value.trim();
+        if (v === "") return;
+        mathSolved++;
+        if (Number(v) === prob.answer) mathCorrect++;
+        prob = makeProblem();
+        stim.textContent = prob.text;
+        input.value = "";
+      }
+      input.addEventListener("keydown", onKey);
+
+      const tick = setInterval(() => {
+        const left = Math.max(0, tEnd - now());
+        const sec = Math.ceil(left / 1000);
+        timerEl.textContent = Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+        if (left <= 0) {
+          clearInterval(tick);
+          input.removeEventListener("keydown", onKey);
+          input.blur();
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
+  // ---------------- Phase 3: Cued recall ----------------
+  async function runTest() {
+    const order = shuffle(items);
+    const input = $("test-input");
+
+    for (let i = 0; i < order.length; i++) {
+      const it = order[i];
+      const testCue = it.retrieval_cue_type === "Original" ? it.encoding_cue : it.novel_cue;
+      await fixation();
+      $("test-stim").textContent = testCue + " - _____";
+      show("s-test");
+      const t0 = now();
+      const r = await waitForEnter(input, t0, true);
+      input.blur();
+      // Lenient score: also accept the participant's own Phase 1 answer (Generate trials).
+      const isCorrect = norm(r.text) === norm(it.target) ? 1 : 0;
+      const study = encodingData.find((d) => d.it === it);
+      const ownWord = study && study.response ? norm(study.response) : "";
+      const isCorrectSelf = isCorrect || (ownWord !== "" && norm(r.text) === ownWord) ? 1 : 0;
+      testData.push({
+        participant_id: participantId,
+        trial_number: i + 1,
+        encoding_mode: it.encoding_mode,
+        retrieval_cue_type: it.retrieval_cue_type,
+        encoding_cue: it.encoding_cue,
+        test_cue: testCue,
+        target_word: it.target,
+        user_response: r.text,
+        is_correct: isCorrect,
+        test_rt_ms: r.rt,
+        is_correct_self: isCorrectSelf
+      });
+    }
+  }
+
+  // ---------------- End screen & export ----------------
+  function fillGrid(tbodyId, scoreKey) {
+    // 2x2 grid: rows = Encoding Mode, columns = Retrieval Cue.
+    const tbody = $(tbodyId);
+    tbody.innerHTML = "";
+    ["Read", "Generate"].forEach((enc) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = '<th class="row">' + enc + "</th>";
+      ["Original", "Novel"].forEach((cue) => {
+        const rows = testData.filter((d) => d.encoding_mode === enc && d.retrieval_cue_type === cue);
+        const n = rows.length;
+        const k = rows.reduce((s, d) => s + d[scoreKey], 0);
+        const pct = n ? (100 * k / n).toFixed(1) : "0.0";
+        tr.innerHTML += '<td class="cell"><span class="pct">' + pct + '%</span>' +
+                        '<span class="cnt">' + k + " / " + n + " correct</span></td>";
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function showResults() {
+    $("end-pid").textContent = participantId;
+    fillGrid("end-table", "is_correct");
+    fillGrid("end-table-self", "is_correct_self");
+    show("s-end");
+  }
+
+  function csvCell(v) {
+    const s = String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function downloadCSV(filename, header, rows) {
+    const lines = [header.join(",")].concat(rows.map((r) => header.map((h) => csvCell(r[h])).join(",")));
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function stamp() {
+    const d = new Date(), p = (n) => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+           "_" + p(d.getHours()) + "h" + p(d.getMinutes()) + "." + p(d.getSeconds());
+  }
+
+  const safeId = () => participantId.replace(/[^A-Za-z0-9_-]/g, "_");
+  let endStamp = "";
+
+  // One row per item, ordered by test trial: the 10 test-phase columns first,
+  // followed by that item's Phase 1 (study) data and the distractor totals.
+  function downloadData() {
+    const header = ["participant_id", "trial_number", "encoding_mode", "retrieval_cue_type",
+      "encoding_cue", "test_cue", "target_word", "user_response", "is_correct", "test_rt_ms",
+      "is_correct_self",
+      "study_trial_number", "generate_response", "generate_correct", "generate_rt_ms",
+      "math_problems_attempted", "math_problems_correct"];
+    const rows = testData.map((t) => {
+      const e = encodingData.find((d) => d.it.target === t.target_word);
+      return Object.assign({}, t, {
+        study_trial_number: e.trial,
+        generate_response: e.response,
+        generate_correct: e.correct,
+        generate_rt_ms: e.rt,
+        math_problems_attempted: mathSolved,
+        math_problems_correct: mathCorrect
+      });
+    });
+    downloadCSV(safeId() + "_Lab4_GenerationEffect_" + endStamp + ".csv", header, rows);
+  }
+
+  $("btn-download").addEventListener("click", downloadData);
+
+  // Warn before accidentally closing mid-experiment.
+  function beforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+
+  // ---------------- Main flow ----------------
+  async function main() {
+    window.addEventListener("beforeunload", beforeUnload);
+    items = assignConditions();
+
+    show("s-instr1");
+    await waitForSpace();
+    show("s-instr1b");
+    await waitForSpace();
+    await runEncoding();
+
+    show("s-instr-math");
+    await waitForSpace();
+    await runDistractor();
+
+    show("s-instr2");
+    await waitForSpace();
+    await runTest();
+
+    endStamp = stamp();
+    window.removeEventListener("beforeunload", beforeUnload);
+    showResults();
+
+    // Automatic download; the button remains as a fallback if the browser blocks it.
+    try {
+      downloadData();
+      $("dl-status").textContent = "Your data file has been downloaded automatically. " +
+        "If you do not see it, click the button below.";
+    } catch (err) {
+      $("dl-status").textContent = "Automatic download failed. Please click the button below.";
+    }
+  }
+
+  function tryStart() {
+    const v = $("pid").value.trim();
+    if (!v) { $("pid-err").textContent = "Please enter your Participant ID."; return; }
+    participantId = v;
+    $("pid").blur();
+    main();
+  }
+
+  $("btn-start").addEventListener("click", tryStart);
+  $("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+  // Default to a random 6-digit ID; participants may overwrite it.
+  $("pid").value = String(100000 + Math.floor(Math.random() * 900000));
+  $("pid").focus();
+  $("pid").select();
+})();
+</script>
+</body>
+</html>
