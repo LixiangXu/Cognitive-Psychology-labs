@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 5: DRM False Memory</title>
+<style>
+  :root {
+    --bg: #7F7F7F;
+    --fg: #FFFFFF;
+    --fg-dim: #F0F0F0;
+    --input-bg: #6E6E6E;
+    --board-bg: #4A4A4A;
+    --grid-line: #565656;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--fg);
+    font-family: Arial, Helvetica, "Helvetica Neue", system-ui, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  .screen {
+    display: none; width: 100%; max-width: 900px; padding: 24px 16px;
+    text-align: center;
+  }
+  .screen.active { display: block; }
+  h1 { font-size: 32px; font-weight: normal; margin: 0 0 24px; }
+  p, li { font-size: 20px; line-height: 1.5; color: var(--fg-dim); }
+  .instr { text-align: left; max-width: 720px; margin: 0 auto; }
+  .instr .keys { margin: 4px 0 16px 24px; }
+  .instr .keys div { font-size: 20px; line-height: 1.6; color: var(--fg-dim); }
+  kbd {
+    display: inline-block; min-width: 28px; padding: 1px 8px; margin: 0 2px;
+    font-family: inherit; font-size: 18px; text-align: center;
+    border: 1.5px solid var(--fg-dim); border-radius: 4px;
+  }
+  .press { font-size: 20px; margin-top: 36px; color: var(--fg); }
+  .stim { font-size: 64px; letter-spacing: 0.04em; margin: 0; min-height: 80px; white-space: nowrap; }
+
+  /* Test screen: word on top; the old/new and confidence panels share one slot below it
+     so the word never moves between the two steps. */
+  .test-stage { width: min(640px, 100%); margin: 0 auto; }
+  .test-stage .stim { font-size: 56px; }
+  .resp-slot { display: grid; height: 200px; }
+  .resp-panel { grid-area: 1 / 1; visibility: hidden; font-size: 24px; color: var(--fg); }
+  .resp-panel.show { visibility: visible; }
+  .side-labels { display: flex; justify-content: space-between; }
+  #resp-oldnew .side-labels { margin-top: 56px; padding: 0 10%; }
+  #resp-conf .conf-q { font-size: 20px; margin-top: 14px; }
+  #resp-conf svg { display: block; width: 56%; height: 28px; margin: 48px auto 0; }
+  #resp-conf .side-labels { width: 64%; margin: 10px auto 0; font-size: 20px; }
+  input[type=text] {
+    font: inherit; font-size: 28px; text-align: center;
+    width: 320px; max-width: 90%; padding: 10px 12px;
+    background: var(--input-bg); color: var(--fg);
+    border: 2px solid var(--fg-dim); border-radius: 4px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--fg); }
+  button {
+    font: inherit; font-size: 20px; padding: 12px 32px; margin-top: 28px;
+    background: var(--fg); color: #4A4A4A; font-weight: bold;
+    border: 2px solid var(--fg); border-radius: 4px; cursor: pointer;
+  }
+  button:hover { background: var(--fg-dim); }
+  label { display: block; font-size: 20px; margin-bottom: 12px; color: var(--fg-dim); }
+  #debug-badge {
+    position: fixed; top: 8px; left: 8px; padding: 2px 8px; font-size: 13px;
+    border: 1px solid var(--fg); border-radius: 3px; opacity: 0.8;
+  }
+  .hint { font-size: 15px; color: var(--fg-dim); margin: -4px 0 14px; }
+  .error { color: #FFE0E0; font-size: 16px; min-height: 22px; margin-top: 10px; }
+
+  /* Tetris */
+  .tetris-wrap { display: flex; justify-content: center; align-items: flex-start; gap: 20px; }
+  #tetris-canvas {
+    background: var(--board-bg); border: 2px solid var(--fg); display: block;
+    height: min(560px, calc(100vh - 60px)); width: auto;
+  }
+  .tetris-side { text-align: left; min-width: 120px; }
+  .tetris-side .lbl { font-size: 16px; color: var(--fg-dim); margin: 0; }
+  .tetris-side .val { font-size: 34px; margin: 0 0 18px; font-variant-numeric: tabular-nums; }
+  #next-canvas { background: var(--board-bg); border: 2px solid var(--fg-dim); display: block; margin-bottom: 18px; }
+  .tetris-side .msg { font-size: 15px; color: var(--fg-dim); min-height: 20px; }
+  .tetris-side .help { font-size: 14px; line-height: 1.6; color: var(--fg-dim); margin-top: 8px; }
+
+  /* Results */
+  table { margin: 0 auto; border-collapse: collapse; font-size: 20px; }
+  th, td { padding: 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.35); }
+  th { font-weight: normal; color: var(--fg-dim); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.lbl { text-align: left; }
+  td.pct { font-size: 26px; }
+  /* Key outcome row (critical lures = false memory rate) */
+  tr.key-row td {
+    background: rgba(255,255,255,0.16); color: var(--fg); font-weight: bold;
+    border-top: 2px solid var(--fg); border-bottom: 2px solid var(--fg);
+  }
+  tr.key-row td:first-child { border-left: 2px solid var(--fg); }
+  tr.key-row td:last-child { border-right: 2px solid var(--fg); }
+  tr.key-row td.pct { font-size: 36px; }
+  .key-tag {
+    display: inline-block; margin-left: 8px; padding: 1px 6px; vertical-align: middle;
+    font-size: 11px; letter-spacing: 0.08em; font-weight: bold;
+    background: var(--fg); color: #4A4A4A; border-radius: 3px;
+  }
+  .note { font-size: 16px; color: var(--fg-dim); max-width: 720px; margin: 20px auto 0; }
+  #btn-download { font-size: 24px; padding: 16px 44px; }
+
+  @media (max-width: 640px) {
+    .stim { font-size: 44px; }
+    table { font-size: 16px; }
+    th, td { padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+<div id="debug-badge" hidden>DEBUG MODE</div>
+
+<!-- Screen 1: Welcome / ID -->
+<div id="s-welcome" class="screen active">
+  <h1>Memory Experiment</h1>
+  <label for="pid">Participant ID / Student ID</label>
+  <p class="hint">A random ID has been filled in. Keep it, or type your own.</p>
+  <input type="text" id="pid" autocomplete="off" spellcheck="false">
+  <div class="error" id="pid-err"></div>
+  <button id="btn-start">Start Experiment</button>
+</div>
+
+<!-- Screen 2: Encoding instructions -->
+<div id="s-enc-instr" class="screen">
+  <h1>Instructions</h1>
+  <div class="instr">
+    <p>You will see a series of words presented one at a time. Pay close attention to each word and memorize them for a later memory test.</p>
+  </div>
+  <p class="press">Press <kbd>SPACE</kbd> to begin.</p>
+</div>
+
+<!-- Phase 1: Encoding -->
+<div id="s-encode" class="screen">
+  <p class="stim" id="enc-word"></p>
+</div>
+
+<!-- Screen 3: Distractor instructions -->
+<div id="s-tet-instr" class="screen">
+  <h1>Short Break: Tetris</h1>
+  <div class="instr">
+    <p>Before the memory test, you will play a short 2.5-minute game of Tetris to clear your working memory. Use <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> arrow keys to move, <kbd>&uarr;</kbd> arrow to rotate, and <kbd>&darr;</kbd> arrow to drop faster.</p>
+  </div>
+  <button id="btn-tetris">Start Tetris Game</button>
+</div>
+
+<!-- Phase 2: Tetris -->
+<div id="s-tetris" class="screen">
+  <div class="tetris-wrap">
+    <canvas id="tetris-canvas" width="280" height="560"></canvas>
+    <div class="tetris-side">
+      <p class="lbl">Time left</p>
+      <p class="val" id="tet-timer">2:30</p>
+      <p class="lbl">Score</p>
+      <p class="val" id="tet-score">0</p>
+      <p class="lbl">Lines</p>
+      <p class="val" id="tet-lines">0</p>
+      <p class="lbl">Next</p>
+      <canvas id="next-canvas" width="112" height="84"></canvas>
+      <div class="msg" id="tet-msg"></div>
+      <div class="help">&larr; &rarr; move<br>&uarr; rotate<br>&darr; drop faster</div>
+    </div>
+  </div>
+</div>
+
+<!-- Screen 4: Test instructions -->
+<div id="s-test-instr" class="screen">
+  <h1>Memory Test</h1>
+  <div class="instr">
+    <p>You will see words one at a time.</p>
+    <p><strong>FIRST:</strong> Decide if the word was on the study list using your RIGHT hand:</p>
+    <div class="keys">
+      <div>Press <kbd>J</kbd> for OLD (Studied)</div>
+      <div>Press <kbd>K</kbd> for NEW (Unstudied)</div>
+    </div>
+    <p><strong>SECOND:</strong> Rate your confidence using your LEFT hand:</p>
+    <div class="keys">
+      <div>Press <kbd>1</kbd> (Very Unsure), <kbd>2</kbd> (Unsure), <kbd>3</kbd> (Sure), or <kbd>4</kbd> (Very Sure)</div>
+    </div>
+  </div>
+  <p class="press">Press <kbd>SPACE</kbd> to begin the test.</p>
+</div>
+
+<!-- Phase 3: Test -->
+<div id="s-test" class="screen">
+  <div class="test-stage">
+    <p class="stim" id="test-word"></p>
+    <div class="resp-slot">
+      <div class="resp-panel" id="resp-oldnew">
+        <div class="side-labels"><span>Old (J)</span><span>New (K)</span></div>
+      </div>
+      <div class="resp-panel" id="resp-conf">
+        <div class="conf-q">Confidence?</div>
+        <svg viewBox="0 0 360 28" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M20 9 H340 V0 L360 14 L340 28 V19 H20 V28 L0 14 L20 0 Z" fill="currentColor"/>
+        </svg>
+        <div class="side-labels"><span>Low (1)</span><span>High (4)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Screen 5: Results -->
+<div id="s-end" class="screen">
+  <h1>Results</h1>
+  <p>Proportion of &ldquo;OLD&rdquo; responses by item type</p>
+  <table>
+    <thead>
+      <tr><th class="lbl" style="text-align:left">Item type</th><th>Measure</th><th>% OLD</th><th>n OLD / N</th><th>Mean conf. (OLD)</th></tr>
+    </thead>
+    <tbody id="results-body"></tbody>
+  </table>
+  <p class="note">Mean confidence is averaged over trials answered OLD (1 = Very Unsure, 4 = Very Sure). The DRM effect appears when the false memory rate for critical lures approaches the hit rate for studied words and exceeds both control rates.</p>
+  <button id="btn-download">Download Data (CSV)</button>
+  <div class="error" id="dl-msg" style="color:var(--fg-dim)"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ======================= Stimuli =======================
+  // Mirrors study_list.csv and test_conditions.csv in this folder.
+  const STUDY_LISTS = [
+    { list: "sweet", words: ["SUGAR", "CANDY", "SOUR", "TASTE", "TOOTH", "NICE", "HONEY", "SODA",
+                             "CHOCOLATE", "HEART", "CAKE", "TART", "PIE", "DELICIOUS", "DESSERT"] },
+    { list: "doctor", words: ["NURSE", "SICK", "LAWYER", "MEDICINE", "HEALTH", "HOSPITAL", "DENTIST",
+                              "PHYSICIAN", "ILL", "PATIENT", "OFFICE", "STETHOSCOPE", "SURGEON", "CLINIC", "CURE"] },
+  ];
+
+  const TEST_ITEMS = [
+    ...["SUGAR", "TASTE", "HONEY", "CHOCOLATE", "CAKE", "DELICIOUS",
+        "NURSE", "MEDICINE", "HOSPITAL", "DENTIST", "PATIENT", "SURGEON"]
+      .map((w, i) => ({ word: w, type: "studied_target", source: i < 6 ? "sweet" : "doctor" })),
+    ...["SWEET", "DOCTOR"].map((w) => ({ word: w, type: "critical_lure", source: w.toLowerCase() })),
+    ...["NEEDLE", "SLEEP"].map((w) => ({ word: w, type: "unstudied_lure" })),
+    ...["MOUNTAIN", "RIVER", "CHAIR", "WINDOW", "CLOCK", "HAMMER",
+        "KING", "BLANKET", "OCEAN", "LAMP", "FOREST", "RADIO"]
+      .map((w) => ({ word: w, type: "unrelated_foil" })),
+  ].map((it) => ({ source: "none", ...it }));
+
+  // ======================= Parameters =======================
+  // Timing (ms). Add ?debug=1 to the URL for a fast run-through.
+  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+  const WORD_MS        = DEBUG ? 200 : 1200;
+  const BLANK_MS       = DEBUG ? 50  : 300;
+  const ITI_MS         = DEBUG ? 100 : 500;
+  const TETRIS_SECONDS = DEBUG ? 10  : 150;
+
+  // ======================= State =======================
+  const EXP_NAME = "Lab5_DRMFalseMemory";
+  let participantId = "";
+  let rows = [];          // one row per trial, all phases (PsychoPy-style long format)
+  let t0 = 0;             // experiment clock zero (performance.now() at Start)
+  let frameMs = 1000 / 60;
+  let expInfo = {};
+  let listOrder = [0, 1];  // indices into STUDY_LISTS, set per participant at Start
+  let started = false;
+  let finished = false;
+
+  // ======================= Helpers =======================
+  const $ = (id) => document.getElementById(id);
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
+
+
+  // Frame-locked screen updates, like win.flip() in PsychoPy: fn() runs in the animation
+  // frame and the frame's timestamp is returned as the onset/offset time.
+  const flip = (fn) => new Promise((r) => requestAnimationFrame((t) => { if (fn) fn(); r(t); }));
+
+  // Like flip(), but waits for the first frame at or after targetT (within half a frame).
+  function flipAt(targetT, fn) {
+    return new Promise((r) => {
+      function tick(t) {
+        if (t >= targetT - frameMs / 2) { if (fn) fn(); r(t); } else requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // Estimate the monitor refresh interval from 60 frames.
+  async function measureFrameRate() {
+    const ts = [];
+    for (let i = 0; i < 61; i++) ts.push(await flip());
+    const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b);
+    frameMs = d[Math.floor(d.length / 2)];
+    return 1000 / frameMs;
+  }
+
+  // Seconds on the experiment clock, rounded to 0.1 ms (PsychoPy logs times in seconds).
+  const sec = (t) => Math.round((t - t0) * 10) / 10000;
+
+  function pad(n, w = 2) { return String(n).padStart(w, "0"); }
+
+  // PsychoPy date format: 2026-10-07_09h54.12.345
+  function psychopyDate(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" +
+      pad(d.getHours()) + "h" + pad(d.getMinutes()) + "." + pad(d.getSeconds()) + "." + pad(d.getMilliseconds(), 3);
+  }
+
+  // Random 6-digit default participant ID, as in PsychoPy Builder.
+  function randomParticipantId() {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+    return pad(n, 6);
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Normalise a KeyboardEvent to a short key name: " ", "j", "k", "1".."4".
+  function keyName(e) {
+    if (e.code && /^(Digit|Numpad)[0-9]$/.test(e.code)) return e.code.slice(-1);
+    if (e.code === "KeyJ") return "j";
+    if (e.code === "KeyK") return "k";
+    if (e.code === "Space") return " ";
+    return (e.key || "").toLowerCase();
+  }
+
+  // Resolve with { key, t } on the first allowed keypress; the listener removes itself.
+  function waitForKey(allowed) {
+    return new Promise((resolve) => {
+      function onKey(e) {
+        if (e.repeat) return;
+        const k = keyName(e);
+        if (!allowed.includes(k)) return;
+        e.preventDefault();
+        // Event timestamp shares the performance.now() clock and is closer to the real keypress.
+        const t = e.timeStamp > 0 ? e.timeStamp : performance.now();
+        document.removeEventListener("keydown", onKey);
+        resolve({ key: k, t });
+      }
+      document.addEventListener("keydown", onKey);
+    });
+  }
+
+  function beforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+
+  // ======================= Phase 1: Encoding =======================
+  const TESTED_WORDS = new Set(TEST_ITEMS.map((it) => it.word));
+
+  async function runEncoding() {
+    show("s-encode");
+    const el = $("enc-word");
+    el.textContent = "";
+    let next = (await flip()) + 1000;   // 1 s blank lead-in
+    let n = 0, prev = null;
+    // List order is counterbalanced per participant; words within a list keep their
+    // fixed order (descending associative strength to the critical lure).
+    for (const listIdx of listOrder) {
+      const block = STUDY_LISTS[listIdx];
+      for (let j = 0; j < block.words.length; j++) {
+        const w = block.words[j];
+        const on = await flipAt(next, () => { el.textContent = w; });
+        const off = await flipAt(on + WORD_MS, () => { el.textContent = ""; });
+        next = off + BLANK_MS;
+        if (prev) prev["study_trial.stopped"] = sec(on);
+        prev = {
+          phase: "study",
+          study_word: w,
+          list_name: block.list,
+          list_position: j + 1,
+          list_critical_lure: block.list.toUpperCase(),
+          tested_later: TESTED_WORDS.has(w) ? 1 : 0,
+          "study_trials.thisRepN": 0,
+          "study_trials.thisTrialN": n,
+          "study_trials.thisN": n,
+          "study_trials.thisIndex": listIdx * block.words.length + j,   // row in study_list.csv
+          "study_trial.started": sec(on),
+          "study_word.started": sec(on),
+          "study_word.stopped": sec(off),
+          "study_word.duration": Math.round(off - on) / 1000,
+        };
+        rows.push(prev);
+        n++;
+      }
+    }
+    prev["study_trial.stopped"] = sec(await flipAt(next));
+  }
+
+  // ======================= Phase 2: Tetris =======================
+  function runTetris(seconds) {
+    return new Promise((resolve) => {
+      const COLS = 10, ROWS = 20, SZ = 28;
+      const canvas = $("tetris-canvas"), ctx = canvas.getContext("2d");
+      const nCanvas = $("next-canvas"), nctx = nCanvas.getContext("2d");
+      const COLORS = { I: "#6FC3DF", O: "#E8D36A", T: "#B58AD6", S: "#7FCB7F", Z: "#E07A7A", J: "#6F8FDF", L: "#E8A55C" };
+      const SHAPES = {
+        I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+        O: [[1,1],[1,1]],
+        T: [[0,1,0],[1,1,1],[0,0,0]],
+        S: [[0,1,1],[1,1,0],[0,0,0]],
+        Z: [[1,1,0],[0,1,1],[0,0,0]],
+        J: [[1,0,0],[1,1,1],[0,0,0]],
+        L: [[0,0,1],[1,1,1],[0,0,0]],
+      };
+
+      let board = emptyBoard();
+      let bag = [];
+      let piece = null, nextType = null;
+      let score = 0, lines = 0;
+      let dropInterval = 600, dropAcc = 0, lastT = null;
+      let softDrop = false;
+      let rafId = null, msgTimer = null;
+      const startT = performance.now();
+      const endT = startT + seconds * 1000;
+
+      function emptyBoard() { return Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+
+      function drawFromBag() {
+        if (bag.length === 0) bag = shuffle(Object.keys(SHAPES));
+        return bag.pop();
+      }
+
+      function spawn() {
+        const type = nextType || drawFromBag();
+        nextType = drawFromBag();
+        const m = SHAPES[type].map((r) => r.slice());
+        piece = { type, m, x: Math.floor((COLS - m[0].length) / 2), y: type === "I" ? -1 : 0 };
+        if (collides(piece.m, piece.x, piece.y)) {
+          // Board full: clear it and keep playing until the timer ends.
+          board = emptyBoard();
+          flash("Board full - cleared!");
+        }
+      }
+
+      function collides(m, px, py) {
+        for (let r = 0; r < m.length; r++) {
+          for (let c = 0; c < m[r].length; c++) {
+            if (!m[r][c]) continue;
+            const x = px + c, y = py + r;
+            if (x < 0 || x >= COLS || y >= ROWS) return true;
+            if (y >= 0 && board[y][x]) return true;
+          }
+        }
+        return false;
+      }
+
+      function rotate(m) {
+        const n = m.length;
+        return m.map((row, r) => row.map((_, c) => m[n - 1 - c][r]));
+      }
+
+      function lock() {
+        piece.m.forEach((row, r) => row.forEach((v, c) => {
+          const y = piece.y + r;
+          if (v && y >= 0) board[y][piece.x + c] = piece.type;
+        }));
+        let cleared = 0;
+        for (let r = ROWS - 1; r >= 0; r--) {
+          if (board[r].every((cell) => cell)) {
+            board.splice(r, 1);
+            board.unshift(Array(COLS).fill(null));
+            cleared++;
+            r++;
+          }
+        }
+        if (cleared) {
+          lines += cleared;
+          score += [0, 100, 300, 500, 800][cleared];
+          dropInterval = Math.max(150, 600 - Math.floor(lines / 5) * 50);
+        }
+        spawn();
+      }
+
+      function step() {
+        if (!collides(piece.m, piece.x, piece.y + 1)) {
+          piece.y++;
+          if (softDrop) score += 1;
+        } else {
+          lock();
+        }
+      }
+
+      function onKeyDown(e) {
+        const k = e.key;
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(k)) return;
+        e.preventDefault();
+        if (k === "ArrowLeft" && !collides(piece.m, piece.x - 1, piece.y)) piece.x--;
+        else if (k === "ArrowRight" && !collides(piece.m, piece.x + 1, piece.y)) piece.x++;
+        else if (k === "ArrowUp" && !e.repeat) {
+          const rm = rotate(piece.m);
+          for (const dx of [0, -1, 1, -2, 2]) {
+            if (!collides(rm, piece.x + dx, piece.y)) { piece.m = rm; piece.x += dx; break; }
+          }
+        } else if (k === "ArrowDown") softDrop = true;
+        draw();
+      }
+      function onKeyUp(e) { if (e.key === "ArrowDown") softDrop = false; }
+      function onBlur() { softDrop = false; }
+
+      function flash(text) {
+        $("tet-msg").textContent = text;
+        clearTimeout(msgTimer);
+        msgTimer = setTimeout(() => { $("tet-msg").textContent = ""; }, 2000);
+      }
+
+      function cell(c2d, x, y, color, sz) {
+        c2d.fillStyle = color;
+        c2d.fillRect(x * sz + 1, y * sz + 1, sz - 2, sz - 2);
+        c2d.fillStyle = "rgba(255,255,255,0.25)";
+        c2d.fillRect(x * sz + 1, y * sz + 1, sz - 2, 3);
+      }
+
+      function draw() {
+        ctx.fillStyle = "#4A4A4A";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "#565656";
+        ctx.lineWidth = 1;
+        for (let c = 1; c < COLS; c++) { ctx.beginPath(); ctx.moveTo(c * SZ + 0.5, 0); ctx.lineTo(c * SZ + 0.5, ROWS * SZ); ctx.stroke(); }
+        for (let r = 1; r < ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r * SZ + 0.5); ctx.lineTo(COLS * SZ, r * SZ + 0.5); ctx.stroke(); }
+        board.forEach((row, r) => row.forEach((t, c) => { if (t) cell(ctx, c, r, COLORS[t], SZ); }));
+        if (piece) {
+          // Ghost piece showing where the current piece will land.
+          let gy = piece.y;
+          while (!collides(piece.m, piece.x, gy + 1)) gy++;
+          ctx.strokeStyle = "rgba(255,255,255,0.45)";
+          piece.m.forEach((row, r) => row.forEach((v, c) => {
+            if (v && gy + r >= 0) ctx.strokeRect((piece.x + c) * SZ + 2.5, (gy + r) * SZ + 2.5, SZ - 5, SZ - 5);
+          }));
+          piece.m.forEach((row, r) => row.forEach((v, c) => {
+            if (v && piece.y + r >= 0) cell(ctx, piece.x + c, piece.y + r, COLORS[piece.type], SZ);
+          }));
+        }
+        // Next piece preview
+        nctx.fillStyle = "#4A4A4A";
+        nctx.fillRect(0, 0, nCanvas.width, nCanvas.height);
+        if (nextType) {
+          const m = SHAPES[nextType], ns = 20;
+          const rows = m.filter((row) => row.some(Boolean));
+          const w = m[0].length * ns, h = rows.length * ns;
+          const ox = (nCanvas.width - w) / 2 / ns, oy = (nCanvas.height - h) / 2 / ns;
+          rows.forEach((row, r) => row.forEach((v, c) => { if (v) cell(nctx, c + ox, r + oy, COLORS[nextType], ns); }));
+        }
+        $("tet-score").textContent = score;
+        $("tet-lines").textContent = lines;
+      }
+
+      function updateTimer(now) {
+        const left = Math.max(0, Math.ceil((endT - now) / 1000));
+        $("tet-timer").textContent = Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
+      }
+
+      function loop(now) {
+        if (now >= endT) { stop(); return; }
+        if (lastT === null) lastT = now;
+        dropAcc += now - lastT;
+        lastT = now;
+        const interval = softDrop ? 40 : dropInterval;
+        while (dropAcc >= interval) { dropAcc -= interval; step(); }
+        updateTimer(now);
+        draw();
+        rafId = requestAnimationFrame(loop);
+      }
+
+      // Backup timer: rAF pauses in background tabs, so make sure the phase still ends on time.
+      const endTimeout = setTimeout(() => stop(), seconds * 1000 + 50);
+      let stopped = false;
+
+      function stop() {
+        if (stopped) return;
+        stopped = true;
+        cancelAnimationFrame(rafId);
+        clearTimeout(endTimeout);
+        clearTimeout(msgTimer);
+        document.removeEventListener("keydown", onKeyDown);
+        document.removeEventListener("keyup", onKeyUp);
+        window.removeEventListener("blur", onBlur);
+        updateTimer(endT);
+        resolve({ score, lines });
+      }
+
+      $("tet-msg").textContent = "";
+      spawn();
+      updateTimer(startT);
+      draw();
+      document.addEventListener("keydown", onKeyDown);
+      document.addEventListener("keyup", onKeyUp);
+      window.addEventListener("blur", onBlur);
+      rafId = requestAnimationFrame(loop);
+    });
+  }
+
+  // ======================= Phase 3: Test =======================
+  async function runTest() {
+    show("s-test");
+    const wordEl = $("test-word"), oldNewEl = $("resp-oldnew"), confEl = $("resp-conf");
+    const order = shuffle(TEST_ITEMS.map((_, idx) => idx));
+
+    wordEl.textContent = "";
+    oldNewEl.classList.remove("show");
+    confEl.classList.remove("show");
+    let next = (await flip()) + ITI_MS;
+
+    for (let i = 0; i < order.length; i++) {
+      const item = TEST_ITEMS[order[i]];
+
+      // Step A: old/new decision
+      const on = await flipAt(next, () => {
+        wordEl.textContent = item.word;
+        oldNewEl.classList.add("show");
+      });
+      const a = await waitForKey(["j", "k"]);
+      const response = a.key === "j" ? "old" : "new";
+
+      // Step B: confidence rating
+      const confOn = await flip(() => { oldNewEl.classList.remove("show"); confEl.classList.add("show"); });
+      const b = await waitForKey(["1", "2", "3", "4"]);
+
+      // Clear the screen; inter-trial interval
+      const off = await flip(() => { wordEl.textContent = ""; confEl.classList.remove("show"); });
+      next = off + ITI_MS;
+
+      const correct = item.type === "studied_target" ? "old" : "new";
+      const row = {
+        phase: "test",
+        test_word: item.word,
+        item_type: item.type,
+        correct_answer: correct,
+        source_list: item.source,
+        "test_trials.thisRepN": 0,
+        "test_trials.thisTrialN": i,
+        "test_trials.thisN": i,
+        "test_trials.thisIndex": order[i],
+        "test_trial.started": sec(on),
+        "test_word.started": sec(on),
+        "key_oldnew.started": sec(on),
+        "key_oldnew.keys": a.key,
+        "key_oldnew.corr": response === correct ? 1 : 0,
+        "key_oldnew.rt": Math.round(a.t - on) / 1000,
+        response_old_new: response,
+        "conf_prompt.started": sec(confOn),
+        "key_conf.started": sec(confOn),
+        "key_conf.keys": b.key,
+        "key_conf.rt": Math.round(b.t - confOn) / 1000,
+        "test_word.stopped": sec(off),
+        "test_trial.stopped": sec(off),
+        "iti.started": sec(off),
+      };
+      rows.push(row);
+      if (i > 0) rows[rows.length - 2]["iti.stopped"] = sec(on);
+    }
+    rows[rows.length - 1]["iti.stopped"] = sec(await flipAt(next));
+  }
+
+  // ======================= Results & CSV =======================
+  const SUMMARY_ROWS = [
+    { type: "studied_target", label: "Studied Targets", measure: "Hit Rate" },
+    { type: "critical_lure", label: "Critical Lures", measure: "False Memory Rate", key: true },
+    { type: "unstudied_lure", label: "Unstudied Control Lures", measure: "Control FA Rate" },
+    { type: "unrelated_foil", label: "Unrelated Baseline Foils", measure: "Baseline FA Rate" },
+  ];
+
+  function showResults() {
+    const body = $("results-body");
+    body.innerHTML = "";
+    for (const row of SUMMARY_ROWS) {
+      const trials = rows.filter((d) => d.phase === "test" && d.item_type === row.type);
+      const olds = trials.filter((d) => d.response_old_new === "old");
+      const pct = trials.length ? (100 * olds.length / trials.length).toFixed(1) + "%" : "-";
+      const conf = olds.length
+        ? (olds.reduce((s, d) => s + Number(d["key_conf.keys"]), 0) / olds.length).toFixed(2)
+        : "-";
+      const tr = document.createElement("tr");
+      if (row.key) tr.className = "key-row";
+      tr.innerHTML =
+        `<td class="lbl">${row.label}</td>` +
+        `<td class="lbl">${row.measure}${row.key ? '<span class="key-tag">KEY RESULT</span>' : ""}</td>` +
+        `<td class="num pct">${pct}</td><td class="num">${olds.length} / ${trials.length}</td>` +
+        `<td class="num">${conf}</td>`;
+      body.appendChild(tr);
+    }
+    show("s-end");
+  }
+
+  // Column order follows PsychoPy: conditions, loop counters and component data per
+  // routine, then the expInfo columns. Cells that don't apply to a row are left empty.
+  const CSV_HEADER = [
+    "phase",
+    "study_word", "list_name", "list_position", "list_critical_lure", "tested_later",
+    "study_trials.thisRepN", "study_trials.thisTrialN", "study_trials.thisN", "study_trials.thisIndex",
+    "study_trial.started", "study_word.started", "study_word.stopped", "study_word.duration", "study_trial.stopped",
+    "tetris.started", "tetris.stopped", "tetris_score", "tetris_lines",
+    "test_word", "item_type", "correct_answer", "source_list",
+    "test_trials.thisRepN", "test_trials.thisTrialN", "test_trials.thisN", "test_trials.thisIndex",
+    "test_trial.started", "test_word.started",
+    "key_oldnew.started", "key_oldnew.keys", "key_oldnew.corr", "key_oldnew.rt", "response_old_new",
+    "conf_prompt.started", "key_conf.started", "key_conf.keys", "key_conf.rt",
+    "test_word.stopped", "test_trial.stopped", "iti.started", "iti.stopped",
+    "participant", "session", "date", "expName", "expStart", "frameRate", "debug", "list_order",
+  ];
+
+  function csvCell(v) {
+    const s = String(v ?? "");
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function safeId() { return participantId.replace(/[^A-Za-z0-9_-]+/g, "_") || "participant"; }
+
+  function downloadCSV() {
+    const lines = [CSV_HEADER.join(",")]
+      .concat(rows.map((r) => CSV_HEADER.map((h) => csvCell({ ...r, ...expInfo }[h])).join(",")));
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    // PsychoPy file name: <participant>_<expName>_<date>.csv
+    a.download = safeId() + "_" + EXP_NAME + "_" + (DEBUG ? "DEBUG_" : "") + expInfo.date + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return a.download;
+  }
+
+  // ======================= Flow =======================
+  async function runExperiment() {
+    window.addEventListener("beforeunload", beforeUnload);
+    t0 = performance.now();
+    listOrder = shuffle([0, 1]);
+    const startDate = new Date();
+    rows = [];
+    expInfo = {
+      participant: participantId,
+      session: "001",
+      date: psychopyDate(startDate),
+      expName: EXP_NAME,
+      expStart: startDate.toISOString(),
+      frameRate: "",
+      debug: DEBUG ? 1 : 0,
+      list_order: STUDY_LISTS[listOrder[0]].list + "_first",   // "sweet_first" or "doctor_first"
+    };
+
+    show("s-enc-instr");
+    // Measure the refresh rate while the instructions are on screen.
+    const fps = measureFrameRate().then((r) => { expInfo.frameRate = Math.round(r * 100) / 100; });
+    await waitForKey([" "]);
+    await fps;
+
+    await runEncoding();
+
+    show("s-tet-instr");
+    await new Promise((resolve) => {
+      const btn = $("btn-tetris");
+      function onClick() { btn.removeEventListener("click", onClick); resolve(); }
+      btn.addEventListener("click", onClick);
+    });
+
+    show("s-tetris");
+    const tetStart = performance.now();
+    const tet = await runTetris(TETRIS_SECONDS);
+    rows.push({
+      phase: "distractor",
+      "tetris.started": sec(tetStart),
+      "tetris.stopped": sec(performance.now()),
+      tetris_score: tet.score,
+      tetris_lines: tet.lines,
+    });
+
+    show("s-test-instr");
+    await waitForKey([" "]);
+
+    await runTest();
+
+    finished = true;
+    window.removeEventListener("beforeunload", beforeUnload);
+    showResults();
+    // Save the data automatically; the button stays as a backup.
+    const name = downloadCSV();
+    $("dl-msg").textContent = "Your data was downloaded automatically as " + name +
+      ". If you can't find it, click the button to download it again.";
+  }
+
+  function tryStart() {
+    const v = $("pid").value.trim();
+    if (started) return;
+    if (!v) { $("pid-err").textContent = "Please enter your ID."; $("pid").focus(); return; }
+    started = true;
+    participantId = v;
+    $("btn-start").disabled = true;
+    runExperiment();
+  }
+
+  $("btn-start").addEventListener("click", tryStart);
+  $("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+  $("btn-download").addEventListener("click", () => {
+    if (finished) $("dl-msg").textContent = "Downloaded " + downloadCSV();
+  });
+  if (DEBUG) $("debug-badge").hidden = false;
+  $("pid").value = randomParticipantId();
+  $("pid").focus();
+  $("pid").select();
+})();
+</script>
+</body>
+</html>
