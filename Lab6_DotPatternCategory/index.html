@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 6: Dot-Pattern Category Learning</title>
+<style>
+  :root {
+    --bg: #7F7F7F;
+    --fg: #FFFFFF;
+    --fg-dim: #F0F0F0;
+    --input-bg: #6E6E6E;
+    --good: #C8F7C5;
+    --bad: #FFD0D0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--fg);
+    font-family: Arial, Helvetica, "Helvetica Neue", system-ui, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  .screen {
+    display: none; width: 100%; max-width: 900px; padding: 24px 16px;
+    text-align: center;
+  }
+  .screen.active { display: block; }
+  h1 { font-size: 32px; font-weight: normal; margin: 0 0 24px; }
+  p, li { font-size: 20px; line-height: 1.5; color: var(--fg-dim); }
+  .instr { text-align: left; max-width: 720px; margin: 0 auto; }
+  .instr .keys { margin: 4px 0 16px 24px; }
+  .instr .keys div { font-size: 20px; line-height: 1.6; color: var(--fg-dim); }
+  .consent { font-size: 16px; line-height: 1.5; max-width: 720px; margin: 0 auto 28px; text-align: left; }
+  kbd {
+    display: inline-block; min-width: 28px; padding: 1px 8px; margin: 0 2px;
+    font-family: inherit; font-size: 18px; text-align: center;
+    border: 1.5px solid var(--fg-dim); border-radius: 4px;
+  }
+  .press { font-size: 20px; margin-top: 36px; color: var(--fg); }
+  input[type=text] {
+    font: inherit; font-size: 28px; text-align: center;
+    width: 320px; max-width: 90%; padding: 10px 12px;
+    background: var(--input-bg); color: var(--fg);
+    border: 2px solid var(--fg-dim); border-radius: 4px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--fg); }
+  button {
+    font: inherit; font-size: 20px; padding: 12px 32px; margin-top: 28px;
+    background: var(--fg); color: #4A4A4A; font-weight: bold;
+    border: 2px solid var(--fg); border-radius: 4px; cursor: pointer;
+  }
+  button:hover { background: var(--fg-dim); }
+  label { display: block; font-size: 20px; margin-bottom: 12px; color: var(--fg-dim); }
+  #debug-badge {
+    position: fixed; top: 8px; left: 8px; padding: 2px 8px; font-size: 13px;
+    border: 1px solid var(--fg); border-radius: 3px; opacity: 0.8;
+  }
+  .hint { font-size: 15px; color: var(--fg-dim); margin: -4px 0 14px; }
+  .error { color: #FFE0E0; font-size: 16px; min-height: 22px; margin-top: 10px; }
+
+  /* Trial screen: the dot canvas, then one slot shared by the key labels and the
+     feedback text so the canvas never moves. */
+  .stage { width: min(440px, 100%); margin: 0 auto; }
+  #dot-canvas {
+    display: block; margin: 0 auto;
+    width: min(400px, 88vw, 62vh); height: min(400px, 88vw, 62vh);
+  }
+  .resp-slot { display: grid; height: 90px; margin-top: 16px; }
+  .resp-panel { grid-area: 1 / 1; visibility: hidden; font-size: 24px; color: var(--fg); }
+  .resp-panel.show { visibility: visible; }
+  .side-labels { display: flex; justify-content: space-between; padding: 0 6%; }
+  #feedback .fb-main { font-size: 36px; font-weight: bold; margin: 0; }
+  #feedback .fb-sub { font-size: 18px; margin: 6px 0 0; color: var(--fg-dim); }
+  #feedback.good .fb-main { color: var(--good); }
+  #feedback.bad .fb-main { color: var(--bad); }
+
+  /* Results */
+  table { margin: 0 auto; border-collapse: collapse; font-size: 20px; }
+  th, td { padding: 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.35); }
+  th { font-weight: normal; color: var(--fg-dim); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.lbl { text-align: left; }
+  td.pct { font-size: 26px; }
+  tr.key-row td {
+    background: rgba(255,255,255,0.16); color: var(--fg); font-weight: bold;
+    border-top: 2px solid var(--fg); border-bottom: 2px solid var(--fg);
+  }
+  tr.key-row td:first-child { border-left: 2px solid var(--fg); }
+  tr.key-row td:last-child { border-right: 2px solid var(--fg); }
+  tr.key-row td.pct { font-size: 36px; }
+  .key-tag {
+    display: inline-block; margin-left: 8px; padding: 1px 6px; vertical-align: middle;
+    font-size: 11px; letter-spacing: 0.08em; font-weight: bold;
+    background: var(--fg); color: #4A4A4A; border-radius: 3px;
+  }
+  .subhead { margin: 28px 0 8px; }
+  .note { font-size: 16px; color: var(--fg-dim); max-width: 720px; margin: 20px auto 0; }
+  #btn-download { font-size: 24px; padding: 16px 44px; }
+
+  @media (max-width: 640px) {
+    table { width: 100%; font-size: 14px; }
+    th, td { padding: 8px 4px; }
+    td.pct { font-size: 18px; }
+    tr.key-row td.pct { font-size: 22px; }
+    .key-tag { display: block; width: fit-content; margin: 4px 0 0; }
+  }
+</style>
+</head>
+<body>
+<div id="debug-badge" hidden>DEBUG MODE</div>
+
+<!-- Screen 1: Welcome / consent / ID -->
+<div id="s-welcome" class="screen active">
+  <h1>Star Cluster Experiment</h1>
+  <div class="consent">
+    <p>You are an astronomer classifying newly discovered, highly variable star clusters. You must learn to distinguish <strong>Star Cluster Alpha</strong> from <strong>Star Cluster Beta</strong>.</p>
+    <p>Each pattern of dots you see is one star cluster. You will classify each one with the <kbd>F</kbd> and <kbd>J</kbd> keys.</p>
+    <p>The experiment takes about 10 minutes. Clicking <em>Start</em> means you agree to take part.</p>
+  </div>
+  <label for="pid">Participant ID / Student ID</label>
+  <p class="hint">A random ID has been filled in.</p>
+  <input type="text" id="pid" autocomplete="off" spellcheck="false">
+  <div class="error" id="pid-err"></div>
+  <button id="btn-start">Start Experiment</button>
+</div>
+
+<!-- Screen 2: Training instructions -->
+<div id="s-train-instr" class="screen">
+  <h1>Part 1: Learning</h1>
+  <div class="instr">
+    <p>Each trial starts with a <strong>+</strong> in the center. Then a star cluster (a pattern of dots) appears and stays on the screen until you answer.</p>
+    <p>Decide which star cluster it is:</p>
+    <div class="keys">
+      <div>Press <kbd>F</kbd> for Star Cluster Alpha</div>
+      <div>Press <kbd>J</kbd> for Star Cluster Beta</div>
+    </div>
+    <p>At first you will have to guess. After each answer you will see <strong>Correct!</strong> or <strong>Incorrect!</strong> &mdash; use this feedback to learn the two categories.</p>
+    <p>Keep your left index finger on <kbd>F</kbd> and your right index finger on <kbd>J</kbd>.</p>
+  </div>
+  <p class="press">Press <kbd>SPACE</kbd> to begin.</p>
+</div>
+
+<!-- Trial screen (training and test) -->
+<div id="s-trial" class="screen">
+  <div class="stage">
+    <canvas id="dot-canvas" width="400" height="400"></canvas>
+    <div class="resp-slot">
+      <div class="resp-panel" id="resp-keys">
+        <div class="side-labels"><span>Alpha (F)</span><span>Beta (J)</span></div>
+      </div>
+      <div class="resp-panel" id="feedback">
+        <p class="fb-main" id="fb-main"></p>
+        <p class="fb-sub" id="fb-sub"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Screen 3: Transition to test -->
+<div id="s-test-instr" class="screen">
+  <h1>Part 2: Test</h1>
+  <div class="instr">
+    <p>Well done! From now on there will be <strong>no feedback</strong>.</p>
+    <p>You will see more dot patterns. Some may look familiar and some will be new. Classify each one as best you can:</p>
+    <div class="keys">
+      <div>Press <kbd>F</kbd> for Star Cluster Alpha</div>
+      <div>Press <kbd>J</kbd> for Star Cluster Beta</div>
+    </div>
+    <p>If you are not sure, go with your first impression.</p>
+  </div>
+  <p class="press">Press <kbd>SPACE</kbd> to begin the test.</p>
+</div>
+
+<!-- Screen 4: Results -->
+<div id="s-end" class="screen">
+  <h1>Thank you!</h1>
+  <p>Test phase: classification accuracy by pattern type</p>
+  <table>
+    <thead>
+      <tr><th class="lbl" style="text-align:left">Pattern type</th><th>% correct</th><th>n / N</th><th>Mean RT (ms)</th></tr>
+    </thead>
+    <tbody id="results-body"></tbody>
+  </table>
+  <p class="subhead">Training phase: accuracy with feedback</p>
+  <table>
+    <thead><tr><th class="lbl" style="text-align:left">Trials</th><th>% correct</th><th>n / N</th></tr></thead>
+    <tbody id="train-body"></tbody>
+  </table>
+  <p class="note">The prototypes were never shown during training. Posner &amp; Keele (1968) found that people classify the unseen prototype about as well as the patterns they trained on, and better than new distortions &mdash; as if they had built up an abstract average of each category. Random patterns belong to neither category, so no answer is correct; the table shows how often you called them Alpha.</p>
+  <button id="btn-download">Download Data (CSV)</button>
+  <div class="error" id="dl-msg" style="color:var(--fg-dim)"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ======================= Parameters =======================
+  // Timing (ms). Add ?debug=1 to the URL for a fast run-through.
+  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+  const FIX_MS      = DEBUG ? 100 : 500;    // fixation cross before each pattern (also the ITI)
+  const FEEDBACK_MS = DEBUG ? 200 : 500;    // "Correct!" / "Incorrect!" (training only)
+  const LEAD_IN_MS  = DEBUG ? 200 : 1000;   // blank screen before the first trial of a phase
+
+  // Dot patterns live on a GRID x GRID field. Prototypes and random patterns use the
+  // central 30 x 30 region, as in Posner, Goldsmith & Welton (1967) and Posner & Keele (1968).
+  const GRID = 50;
+  const N_DOTS = 9;
+  const PROTO_MIN = 10, PROTO_MAX = 39;
+  const MIN_DOT_SPACING = 3;   // grid units between any two dots of a prototype / random pattern
+
+  // Distortion rule adapted from Posner, Goldsmith & Welton (1967): each dot moves into one of
+  // five "areas" around its prototype position. AREA_RINGS gives the range of displacement
+  // (in grid units, chessboard distance) for each area; LEVELS gives the probability of each area.
+  const AREA_RINGS = [[0, 0], [1, 1], [2, 3], [4, 5], [6, 9]];
+  const LEVELS = {
+    low:  { label: "3",   probs: [0.59, 0.20, 0.16, 0.03, 0.02] },   // level 3: most dots barely move
+    high: { label: "7.7", probs: [0.00, 0.24, 0.16, 0.30, 0.30] },   // level 7.7: every dot moves, many far
+  };
+
+  const KEY_FOR = { Alpha: "f", Beta: "j" };
+  const CAT_FOR = { f: "Alpha", j: "Beta" };
+
+  // ======================= Conditions =======================
+  // Mirrors training_conditions.csv and test_conditions.csv in this folder.
+  const TRAIN_CONDITIONS = [];
+  for (const cat of ["Alpha", "Beta"]) {
+    for (const dist of ["low", "high"]) {
+      for (let ex = 1; ex <= 10; ex++) {
+        TRAIN_CONDITIONS.push({ train_category: cat, train_distortion: dist, train_exemplar: ex, train_corr_key: KEY_FOR[cat] });
+      }
+    }
+  }
+
+  const TEST_TYPES = ["prototype", "old_low", "old_high", "new_low", "new_high"];
+  const TEST_CONDITIONS = [];
+  for (const cat of ["Alpha", "Beta"]) {
+    for (const type of TEST_TYPES) {
+      for (let i = 0; i < 3; i++) TEST_CONDITIONS.push({ test_item_type: type, test_category: cat, test_corr_key: KEY_FOR[cat] });
+    }
+  }
+  for (let i = 0; i < 10; i++) TEST_CONDITIONS.push({ test_item_type: "random", test_category: "none", test_corr_key: "" });
+
+  // Plain-language names for the StimulusType column and the results table.
+  const STIM_TYPE_LABEL = {
+    low: "Low Distortion", high: "High Distortion",
+    prototype: "Prototype", old_low: "Old Low Distortion", old_high: "Old High Distortion",
+    new_low: "New Low Distortion", new_high: "New High Distortion", random: "Random",
+  };
+
+  // ======================= State =======================
+  const EXP_NAME = "Lab6_DotPatternCategory";
+  let participantId = "";
+  let rows = [];          // one row per trial, all phases (PsychoPy-style long format)
+  let t0 = 0;             // experiment clock zero (performance.now() at Start)
+  let frameMs = 1000 / 60;
+  let expInfo = {};
+  let stimuli = null;     // patterns generated for this participant
+  let started = false;
+  let finished = false;
+
+  // ======================= Helpers =======================
+  const $ = (id) => document.getElementById(id);
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
+
+  // Frame-locked screen updates, like win.flip() in PsychoPy: fn() runs in the animation
+  // frame and the frame's timestamp is returned as the onset/offset time.
+  const flip = (fn) => new Promise((r) => requestAnimationFrame((t) => { if (fn) fn(); r(t); }));
+
+  // Like flip(), but waits for the first frame at or after targetT (within half a frame).
+  function flipAt(targetT, fn) {
+    return new Promise((r) => {
+      function tick(t) {
+        if (t >= targetT - frameMs / 2) { if (fn) fn(); r(t); } else requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // Estimate the monitor refresh interval from 60 frames.
+  async function measureFrameRate() {
+    const ts = [];
+    for (let i = 0; i < 61; i++) ts.push(await flip());
+    const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b);
+    frameMs = d[Math.floor(d.length / 2)];
+    return 1000 / frameMs;
+  }
+
+  // Seconds on the experiment clock, rounded to 0.1 ms (PsychoPy logs times in seconds).
+  const sec = (t) => Math.round((t - t0) * 10) / 10000;
+  // Durations rounded to 0.1 ms, in seconds and in milliseconds.
+  const durSec = (a, b) => Math.round((b - a) * 10) / 10000;
+  const durMs = (a, b) => Math.round((b - a) * 10) / 10;
+
+  function pad(n, w = 2) { return String(n).padStart(w, "0"); }
+
+  // PsychoPy date format: 2026-10-07_09h54.12.345
+  function psychopyDate(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" +
+      pad(d.getHours()) + "h" + pad(d.getMinutes()) + "." + pad(d.getSeconds()) + "." + pad(d.getMilliseconds(), 3);
+  }
+
+  // Random 6-digit default participant ID, as in PsychoPy Builder.
+  function randomParticipantId() {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+    return pad(n, 6);
+  }
+
+  function shuffle(arr, rand = Math.random) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Normalise a KeyboardEvent to a short key name: " ", "f", "j".
+  function keyName(e) {
+    if (e.code === "KeyF") return "f";
+    if (e.code === "KeyJ") return "j";
+    if (e.code === "Space") return " ";
+    return (e.key || "").toLowerCase();
+  }
+
+  // Resolve with { key, t } on the first allowed keypress; the listener removes itself.
+  function waitForKey(allowed) {
+    return new Promise((resolve) => {
+      function onKey(e) {
+        if (e.repeat) return;
+        const k = keyName(e);
+        if (!allowed.includes(k)) return;
+        e.preventDefault();
+        // Event timestamp shares the performance.now() clock and is closer to the real keypress.
+        const t = e.timeStamp > 0 ? e.timeStamp : performance.now();
+        document.removeEventListener("keydown", onKey);
+        resolve({ key: k, t });
+      }
+      document.addEventListener("keydown", onKey);
+    });
+  }
+
+  function beforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+
+  // ======================= Stimulus generation =======================
+  // Seeded generator (mulberry32) so a participant's patterns can be rebuilt from stim_seed.
+  function makeRng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const randInt = (rand, lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));
+
+  // Nine dots placed at random on the central 30 x 30 region, no two closer than MIN_DOT_SPACING.
+  function randomPattern(rand) {
+    const dots = [];
+    while (dots.length < N_DOTS) {
+      const p = [randInt(rand, PROTO_MIN, PROTO_MAX), randInt(rand, PROTO_MIN, PROTO_MAX)];
+      if (dots.every((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) >= MIN_DOT_SPACING)) dots.push(p);
+    }
+    return dots;
+  }
+
+  // Every grid offset whose chessboard distance from (0,0) lies in [lo, hi].
+  const RING_OFFSETS = AREA_RINGS.map(([lo, hi]) => {
+    const offs = [];
+    for (let dx = -hi; dx <= hi; dx++) {
+      for (let dy = -hi; dy <= hi; dy++) {
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        if (d >= lo && d <= hi) offs.push([dx, dy]);
+      }
+    }
+    return offs;
+  });
+
+  // Jitter each prototype dot: pick an area with the level's probabilities, then a random
+  // cell in that area. Re-draw a dot if it leaves the field or lands on another dot.
+  function distort(proto, level, rand) {
+    const probs = LEVELS[level].probs;
+    const out = [];
+    for (const [x, y] of proto) {
+      for (let tries = 0; ; tries++) {
+        let r = rand(), area = 0;
+        while (area < probs.length - 1 && r >= probs[area]) { r -= probs[area]; area++; }
+        const offs = RING_OFFSETS[area];
+        const [dx, dy] = offs[Math.floor(rand() * offs.length)];
+        const p = [x + dx, y + dy];
+        const inField = p[0] >= 0 && p[0] < GRID && p[1] >= 0 && p[1] < GRID;
+        const free = out.every((q) => q[0] !== p[0] || q[1] !== p[1]);
+        if ((inField && free) || tries > 100) { out.push(p); break; }
+      }
+    }
+    return out;
+  }
+
+  // Mean distance (grid units) between each dot and its prototype dot.
+  function meanShift(dots, proto) {
+    const s = dots.reduce((acc, p, i) => acc + Math.hypot(p[0] - proto[i][0], p[1] - proto[i][1]), 0);
+    return Math.round((s / dots.length) * 100) / 100;
+  }
+
+  const dotsString = (dots) => dots.map((p) => p[0] + " " + p[1]).join(";");
+
+  // Build every pattern this participant will see: two prototypes, 10 low + 10 high training
+  // distortions per category, new test distortions, and 10 random patterns.
+  function buildStimuli(seed) {
+    const rand = makeRng(seed);
+    const proto = { Alpha: randomPattern(rand), Beta: randomPattern(rand) };
+    const pat = (id, cat, dots) => ({ id, cat, dots, shift: cat === "none" ? "" : meanShift(dots, proto[cat]) });
+
+    const train = {};
+    const old = {};
+    for (const cat of ["Alpha", "Beta"]) {
+      for (const dist of ["low", "high"]) {
+        const list = [];
+        for (let ex = 1; ex <= 10; ex++) list.push(pat(cat + "_" + dist + "_" + pad(ex), cat, distort(proto[cat], dist, rand)));
+        train[cat + "_" + dist] = list;
+        // Three of the ten training exemplars come back at test as "old" items.
+        old[cat + "_" + dist] = shuffle(list, rand).slice(0, 3);
+      }
+    }
+
+    // Assign a pattern to each row of TEST_CONDITIONS.
+    const counts = {};
+    let nRandom = 0;
+    const test = TEST_CONDITIONS.map((c) => {
+      const cat = c.test_category, type = c.test_item_type;
+      const key = cat + "_" + type;
+      const n = (counts[key] = (counts[key] || 0) + 1);
+      if (type === "prototype") return pat(cat + "_prototype", cat, proto[cat]);
+      if (type === "old_low") return old[cat + "_low"][n - 1];
+      if (type === "old_high") return old[cat + "_high"][n - 1];
+      if (type === "new_low") return pat(cat + "_newlow_" + pad(n), cat, distort(proto[cat], "low", rand));
+      if (type === "new_high") return pat(cat + "_newhigh_" + pad(n), cat, distort(proto[cat], "high", rand));
+      return pat("random_" + pad(++nRandom), "none", randomPattern(rand));
+    });
+
+    return { proto, train, test };
+  }
+
+  // ======================= Drawing =======================
+  const canvas = $("dot-canvas");
+  const ctx = canvas.getContext("2d");
+  const CANVAS_CSS = 400;
+
+  function setupCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(CANVAS_CSS * dpr);
+    canvas.height = Math.round(CANVAS_CSS * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function clearCanvas() { ctx.clearRect(0, 0, CANVAS_CSS, CANVAS_CSS); }
+
+  function drawFixation() {
+    clearCanvas();
+    const c = CANVAS_CSS / 2;
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(c - 14, c); ctx.lineTo(c + 14, c);
+    ctx.moveTo(c, c - 14); ctx.lineTo(c, c + 14);
+    ctx.stroke();
+  }
+
+  function drawPattern(dots) {
+    clearCanvas();
+    const cell = CANVAS_CSS / GRID;
+    ctx.fillStyle = "#FFFFFF";
+    for (const [x, y] of dots) {
+      ctx.beginPath();
+      ctx.arc((x + 0.5) * cell, (y + 0.5) * cell, cell * 1.0, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  }
+
+  // ======================= Trial =======================
+  // One classification trial: fixation -> pattern, which stays up until an F or J response.
+  // The caller clears the pattern on the next frame, which is logged as the stimulus offset.
+  async function classify(pattern, next) {
+    const keysEl = $("resp-keys");
+    const fixOn = await flipAt(next, () => { drawFixation(); keysEl.classList.add("show"); });
+    const on = await flipAt(fixOn + FIX_MS, () => drawPattern(pattern.dots));
+    const keyP = waitForKey(["f", "j"]);
+    const resp = await keyP;
+    return { fixOn, on, resp };
+  }
+
+  // ======================= Phase 1: Training =======================
+  async function runTraining() {
+    show("s-trial");
+    const keysEl = $("resp-keys"), fbEl = $("feedback");
+    keysEl.classList.remove("show");
+    fbEl.classList.remove("show");
+    clearCanvas();
+    const order = shuffle(TRAIN_CONDITIONS.map((_, idx) => idx));
+    let next = (await flip()) + LEAD_IN_MS;
+
+    for (let i = 0; i < order.length; i++) {
+      const cond = TRAIN_CONDITIONS[order[i]];
+      const pattern = stimuli.train[cond.train_category + "_" + cond.train_distortion][cond.train_exemplar - 1];
+      const tr = await classify(pattern, next);
+      const respCat = CAT_FOR[tr.resp.key];
+      const correct = respCat === cond.train_category;
+
+      // Feedback
+      const fbOn = await flip(() => {
+        clearCanvas();
+        keysEl.classList.remove("show");
+        $("fb-main").textContent = correct ? "Correct!" : "Incorrect!";
+        $("fb-sub").textContent = "That was Star Cluster " + cond.train_category + ".";
+        fbEl.className = "resp-panel show " + (correct ? "good" : "bad");
+      });
+      const fbOff = await flipAt(fbOn + FEEDBACK_MS, () => { fbEl.className = "resp-panel"; });
+      next = fbOff;
+
+      rows.push({
+        TrialNumber: i + 1,
+        Phase: "Training",
+        StimulusType: STIM_TYPE_LABEL[cond.train_distortion],
+        TrueCategory: cond.train_category,
+        ParticipantResponse: respCat,
+        Accuracy: correct ? 1 : 0,
+        ReactionTime: durMs(tr.on, tr.resp.t),
+        phase: "training",
+        ...cond,
+        "train_trials.thisRepN": 0,
+        "train_trials.thisTrialN": i,
+        "train_trials.thisN": i,
+        "train_trials.thisIndex": order[i],
+        "train_trial.started": sec(tr.fixOn),
+        "train_fix.started": sec(tr.fixOn),
+        "train_fix.stopped": sec(tr.on),
+        "train_stim.started": sec(tr.on),
+        "train_stim.stopped": sec(fbOn),
+        "key_train.started": sec(tr.on),
+        "key_train.keys": tr.resp.key,
+        "key_train.rt": durSec(tr.on, tr.resp.t),
+        "key_train.corr": correct ? 1 : 0,
+        "train_trial.stopped": sec(fbOn),
+        "feedback.started": sec(fbOn),
+        "feedback_text.started": sec(fbOn),
+        "feedback_text.stopped": sec(fbOff),
+        "feedback.stopped": sec(fbOff),
+        pattern_id: pattern.id,
+        dots_xy: dotsString(pattern.dots),
+        mean_dot_shift: pattern.shift,
+      });
+    }
+  }
+
+  // ======================= Phase 2: Test =======================
+  async function runTest() {
+    show("s-trial");
+    const keysEl = $("resp-keys");
+    keysEl.classList.remove("show");
+    $("feedback").className = "resp-panel";
+    clearCanvas();
+    const order = shuffle(TEST_CONDITIONS.map((_, idx) => idx));
+    let next = (await flip()) + LEAD_IN_MS;
+
+    for (let i = 0; i < order.length; i++) {
+      const cond = TEST_CONDITIONS[order[i]];
+      const pattern = stimuli.test[order[i]];
+      const tr = await classify(pattern, next);
+      const respCat = CAT_FOR[tr.resp.key];
+      const scored = cond.test_category !== "none";   // random patterns have no right answer
+      const correct = respCat === cond.test_category;
+      const end = await flip(() => { clearCanvas(); keysEl.classList.remove("show"); });
+      next = end;
+
+      rows.push({
+        TrialNumber: i + 1,
+        Phase: "Test",
+        StimulusType: STIM_TYPE_LABEL[cond.test_item_type],
+        TrueCategory: cond.test_category,
+        ParticipantResponse: respCat,
+        Accuracy: scored ? (correct ? 1 : 0) : "",
+        ReactionTime: durMs(tr.on, tr.resp.t),
+        phase: "test",
+        ...cond,
+        "test_trials.thisRepN": 0,
+        "test_trials.thisTrialN": i,
+        "test_trials.thisN": i,
+        "test_trials.thisIndex": order[i],
+        "test_trial.started": sec(tr.fixOn),
+        "test_fix.started": sec(tr.fixOn),
+        "test_fix.stopped": sec(tr.on),
+        "test_stim.started": sec(tr.on),
+        "test_stim.stopped": sec(end),
+        "key_test.started": sec(tr.on),
+        "key_test.keys": tr.resp.key,
+        "key_test.rt": durSec(tr.on, tr.resp.t),
+        "key_test.corr": scored ? (correct ? 1 : 0) : "",
+        "test_trial.stopped": sec(end),
+        pattern_id: pattern.id,
+        dots_xy: dotsString(pattern.dots),
+        mean_dot_shift: pattern.shift,
+      });
+    }
+  }
+
+  // ======================= Results & CSV =======================
+  const SUMMARY_ROWS = [
+    { type: "prototype", key: true },
+    { type: "old_low" }, { type: "old_high" },
+    { type: "new_low" }, { type: "new_high" },
+  ];
+
+  const pct = (k, n) => (n ? (100 * k / n).toFixed(1) + "%" : "-");
+  const meanRt = (trials) => (trials.length ? Math.round(trials.reduce((s, d) => s + d.ReactionTime, 0) / trials.length) : "-");
+
+  function showResults() {
+    const test = rows.filter((d) => d.phase === "test");
+    const body = $("results-body");
+    body.innerHTML = "";
+    for (const row of SUMMARY_ROWS) {
+      const trials = test.filter((d) => d.test_item_type === row.type);
+      const k = trials.filter((d) => d.Accuracy === 1).length;
+      const tr = document.createElement("tr");
+      if (row.key) tr.className = "key-row";
+      tr.innerHTML =
+        `<td class="lbl">${STIM_TYPE_LABEL[row.type]}${row.key ? '<span class="key-tag">KEY RESULT</span>' : ""}</td>` +
+        `<td class="num pct">${pct(k, trials.length)}</td><td class="num">${k} / ${trials.length}</td>` +
+        `<td class="num">${meanRt(trials)}</td>`;
+      body.appendChild(tr);
+    }
+    const rnd = test.filter((d) => d.test_item_type === "random");
+    const nA = rnd.filter((d) => d.ParticipantResponse === "Alpha").length;
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td class="lbl">Random (% called Alpha)</td>` +
+      `<td class="num pct">${pct(nA, rnd.length)}</td><td class="num">${nA} / ${rnd.length}</td>` +
+      `<td class="num">${meanRt(rnd)}</td>`;
+    body.appendChild(tr);
+
+    const train = rows.filter((d) => d.phase === "training");
+    const tbody = $("train-body");
+    tbody.innerHTML = "";
+    for (const [label, lo, hi] of [["Trials 1–20", 1, 20], ["Trials 21–40", 21, 40]]) {
+      const trials = train.filter((d) => d.TrialNumber >= lo && d.TrialNumber <= hi);
+      const k = trials.filter((d) => d.Accuracy === 1).length;
+      const r = document.createElement("tr");
+      r.innerHTML = `<td class="lbl">${label}</td><td class="num pct">${pct(k, trials.length)}</td><td class="num">${k} / ${trials.length}</td>`;
+      tbody.appendChild(r);
+    }
+    show("s-end");
+  }
+
+  // Requested summary columns first, then PsychoPy's order: conditions, loop counters and
+  // component data per routine, stimulus details, then the expInfo columns.
+  // Cells that don't apply to a row are left empty.
+  const CSV_HEADER = [
+    "TrialNumber", "Phase", "StimulusType", "TrueCategory", "ParticipantResponse", "Accuracy", "ReactionTime",
+    "phase",
+    "train_category", "train_distortion", "train_exemplar", "train_corr_key",
+    "train_trials.thisRepN", "train_trials.thisTrialN", "train_trials.thisN", "train_trials.thisIndex",
+    "train_trial.started", "train_fix.started", "train_fix.stopped", "train_stim.started", "train_stim.stopped",
+    "key_train.started", "key_train.keys", "key_train.rt", "key_train.corr", "train_trial.stopped",
+    "feedback.started", "feedback_text.started", "feedback_text.stopped", "feedback.stopped",
+    "test_item_type", "test_category", "test_corr_key",
+    "test_trials.thisRepN", "test_trials.thisTrialN", "test_trials.thisN", "test_trials.thisIndex",
+    "test_trial.started", "test_fix.started", "test_fix.stopped", "test_stim.started", "test_stim.stopped",
+    "key_test.started", "key_test.keys", "key_test.rt", "key_test.corr", "test_trial.stopped",
+    "pattern_id", "dots_xy", "mean_dot_shift",
+    "participant", "session", "date", "expName", "expStart", "frameRate", "debug",
+    "stim_seed", "prototype_Alpha", "prototype_Beta",
+  ];
+
+  function csvCell(v) {
+    const s = String(v ?? "");
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function safeId() { return participantId.replace(/[^A-Za-z0-9_-]+/g, "_") || "participant"; }
+
+  function downloadCSV() {
+    const lines = [CSV_HEADER.join(",")]
+      .concat(rows.map((r) => CSV_HEADER.map((h) => csvCell({ ...r, ...expInfo }[h])).join(",")));
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    // PsychoPy file name: <participant>_<expName>_<date>.csv
+    a.download = safeId() + "_" + EXP_NAME + "_" + (DEBUG ? "DEBUG_" : "") + expInfo.date + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return a.download;
+  }
+
+  // ======================= Flow =======================
+  async function runExperiment() {
+    window.addEventListener("beforeunload", beforeUnload);
+    t0 = performance.now();
+    const startDate = new Date();
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    stimuli = buildStimuli(seed);
+    rows = [];
+    expInfo = {
+      participant: participantId,
+      session: "001",
+      date: psychopyDate(startDate),
+      expName: EXP_NAME,
+      expStart: startDate.toISOString(),
+      frameRate: "",
+      debug: DEBUG ? 1 : 0,
+      stim_seed: seed,
+      prototype_Alpha: dotsString(stimuli.proto.Alpha),
+      prototype_Beta: dotsString(stimuli.proto.Beta),
+    };
+
+    show("s-train-instr");
+    // Measure the refresh rate while the instructions are on screen.
+    const fps = measureFrameRate().then((r) => { expInfo.frameRate = Math.round(r * 100) / 100; });
+    await waitForKey([" "]);
+    await fps;
+
+    await runTraining();
+
+    show("s-test-instr");
+    await waitForKey([" "]);
+
+    await runTest();
+
+    finished = true;
+    window.removeEventListener("beforeunload", beforeUnload);
+    showResults();
+    // Save the data automatically; the button stays as a backup.
+    const name = downloadCSV();
+    $("dl-msg").textContent = "Your data was downloaded automatically as " + name +
+      ". If you can't find it, click the button to download it again.";
+  }
+
+  function tryStart() {
+    const v = $("pid").value.trim();
+    if (started) return;
+    if (!v) { $("pid-err").textContent = "Please enter your ID."; $("pid").focus(); return; }
+    started = true;
+    participantId = v;
+    $("btn-start").disabled = true;
+    runExperiment();
+  }
+
+  setupCanvas();
+  $("btn-start").addEventListener("click", tryStart);
+  $("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+  $("btn-download").addEventListener("click", () => {
+    if (finished) $("dl-msg").textContent = "Downloaded " + downloadCSV();
+  });
+  if (DEBUG) $("debug-badge").hidden = false;
+  $("pid").value = randomParticipantId();
+  $("pid").focus();
+  $("pid").select();
+})();
+</script>
+</body>
+</html>
