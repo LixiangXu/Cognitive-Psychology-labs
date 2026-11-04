@@ -1,0 +1,10 @@
+task_type,target_x1,target_y1,target_x2,target_y2,target_slider_1,target_slider_2
+projectile,0.80,0.80,0.45,0.30,,
+projectile,0.55,0.80,0.33,0.55,,
+projectile,0.90,0.80,0.50,0.15,,
+ripple,,,,,30,20
+ripple,,,,,90,45
+ripple,,,,,50,12
+shadow,0.25,0.05,,,,
+shadow,-0.20,-0.15,,,,
+shadow,0.10,0.25,,,,

@@ -1,0 +1,13 @@
+reading_sentence,reading_probe,probe_present,probe_corr_key
+The librarian stacked the returned books on the metal cart.,cart,1,y
+A small dog chased the red ball across the wet grass.,cat,0,n
+The teacher wrote the homework assignment on the whiteboard.,homework,1,y
+Fresh bread was cooling on the kitchen counter near the window.,oven,0,n
+The bus driver waited patiently at the crowded corner stop.,driver,1,y
+Two children built a tall sandcastle close to the water.,bucket,0,n
+The old clock in the hallway chimed twelve times at midnight.,hallway,1,y
+A gardener watered the roses early in the cool morning.,tulips,0,n
+The pilot announced that the plane would land in twenty minutes.,plane,1,y
+The mechanic replaced the worn tires on the delivery truck.,engine,0,n
+A waiter carried three plates of pasta to the corner table.,pasta,1,y
+The students lined up quietly outside the gymnasium door.,cafeteria,0,n

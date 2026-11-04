@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 7: Visual Imagery and Language</title>
+<style>
+  :root {
+    --bg: #7F7F7F;
+    --fg: #FFFFFF;
+    --fg-dim: #F0F0F0;
+    --input-bg: #6E6E6E;
+    --good: #C8F7C5;
+    --bad: #FFD0D0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--fg);
+    font-family: Arial, Helvetica, "Helvetica Neue", system-ui, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  .screen {
+    display: none; width: 100%; max-width: 960px; padding: 24px 16px;
+    text-align: center;
+  }
+  .screen.active { display: block; }
+  h1 { font-size: 32px; font-weight: normal; margin: 0 0 24px; }
+  h2 { font-size: 24px; font-weight: normal; margin: 24px 0 8px; }
+  p, li { font-size: 20px; line-height: 1.5; color: var(--fg-dim); }
+  .instr { text-align: left; max-width: 760px; margin: 0 auto; }
+  .instr ol, .instr ul { margin: 4px 0 16px 24px; padding: 0; }
+  .consent { font-size: 16px; line-height: 1.5; max-width: 720px; margin: 0 auto 28px; text-align: left; }
+  kbd {
+    display: inline-block; min-width: 28px; padding: 1px 8px; margin: 0 2px;
+    font-family: inherit; font-size: 18px; text-align: center;
+    border: 1.5px solid var(--fg-dim); border-radius: 4px;
+  }
+  .press { font-size: 20px; margin-top: 36px; color: var(--fg); }
+  input[type=text] {
+    font: inherit; font-size: 28px; text-align: center;
+    width: 320px; max-width: 90%; padding: 10px 12px;
+    background: var(--input-bg); color: var(--fg);
+    border: 2px solid var(--fg-dim); border-radius: 4px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--fg); }
+  button {
+    font: inherit; font-size: 20px; padding: 12px 32px; margin-top: 28px;
+    background: var(--fg); color: #4A4A4A; font-weight: bold;
+    border: 2px solid var(--fg); border-radius: 4px; cursor: pointer;
+  }
+  button:hover { background: var(--fg-dim); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  label { display: block; font-size: 20px; margin-bottom: 12px; color: var(--fg-dim); }
+  #debug-badge {
+    position: fixed; top: 8px; left: 8px; padding: 2px 8px; font-size: 13px;
+    border: 1px solid var(--fg); border-radius: 3px; opacity: 0.8; z-index: 10;
+  }
+  .hint { font-size: 15px; color: var(--fg-dim); margin: -4px 0 14px; }
+  .error { color: #FFE0E0; font-size: 16px; min-height: 22px; margin-top: 10px; }
+  .fix { font-size: 56px; line-height: 1; }
+
+  /* Reading baseline */
+  #rd-sentence { font-size: 30px; line-height: 1.5; max-width: 820px; margin: 0 auto; min-height: 90px; color: var(--fg); }
+  #rd-probe { font-size: 48px; font-weight: bold; margin: 0; color: var(--fg); }
+  .rd-hint { font-size: 18px; margin-top: 36px; color: var(--fg-dim); }
+
+  /* Imagery prompt */
+  #prompt-text { font-size: 32px; line-height: 1.5; max-width: 820px; margin: 0 auto; color: var(--fg); }
+
+  /* Vividness rating */
+  .vivid-intro { font-size: 18px; color: var(--fg-dim); margin-bottom: 8px; }
+  #vivid-question { font-size: 30px; line-height: 1.4; margin: 0 0 24px; color: var(--fg); }
+  .scale { display: grid; grid-template-columns: auto 1fr; gap: 10px 18px; max-width: 640px; margin: 0 auto; text-align: left; }
+  .scale kbd { font-size: 22px; min-width: 40px; padding: 4px 10px; }
+  .scale span { font-size: 19px; line-height: 1.4; color: var(--fg-dim); align-self: center; }
+
+  /* Interactive task screen */
+  #task-label {
+    font-size: 22px; line-height: 1.4; min-height: 62px; max-width: 880px; margin: 0 auto 12px; color: var(--fg);
+  }
+  #task-stage { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
+  #task-stage canvas {
+    display: block; border: 2px solid var(--fg-dim); border-radius: 4px; touch-action: none;
+    width: min(800px, 94vw); height: auto; background: #5d6b78; cursor: crosshair;
+  }
+  .panel { display: flex; flex-direction: column; align-items: center; }
+  .panel .cap { font-size: 18px; margin-bottom: 6px; color: var(--fg-dim); letter-spacing: 0.06em; }
+  .panel canvas { width: min(440px, 46vw) !important; }
+  .sliders {
+    display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; margin-top: 14px;
+  }
+  .sliders label { font-size: 18px; margin: 0; }
+  .sliders input[type=range] { display: block; width: 300px; max-width: 80vw; margin: 8px auto 0; accent-color: #ffffff; cursor: pointer; }
+  #task-hint { font-size: 18px; min-height: 28px; margin-top: 12px; color: var(--fg-dim); }
+  #btn-submit { margin-top: 12px; padding: 10px 44px; }
+
+  /* Results */
+  table { margin: 0 auto; border-collapse: collapse; font-size: 18px; }
+  th, td { padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.35); }
+  th { font-weight: normal; color: var(--fg-dim); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.lbl { text-align: left; }
+  .note { font-size: 16px; color: var(--fg-dim); max-width: 760px; margin: 20px auto 0; }
+  #btn-download { font-size: 24px; padding: 16px 44px; }
+  @media (max-width: 640px) {
+    table { width: 100%; font-size: 13px; }
+    th, td { padding: 6px 4px; }
+  }
+</style>
+</head>
+<body>
+<div id="debug-badge" hidden>DEBUG MODE</div>
+
+<!-- Welcome -->
+<div id="s-welcome" class="screen active">
+  <h1>Mental Imagery Experiment</h1>
+  <div class="consent">
+    <p>In this experiment you will read short sentences that describe simple physical scenes: an object being thrown, something dropping into water, or a light casting a shadow. Your job is to form a clear <strong>mental image</strong> of each scene, then adjust a picture on the screen so that it matches your image.</p>
+    <p>There are no right or wrong answers for the imagery questions. We are interested in <em>how</em> people picture what they read. Some other parts measure how fast you read and how fast you can use the mouse.</p>
+    <p>The experiment takes about 20 minutes and runs in full screen. Clicking <em>Start</em> means you agree to take part.</p>
+  </div>
+  <label for="pid">Participant ID / Student ID</label>
+  <p class="hint">A random ID has been filled in. You can keep it or type your own.</p>
+  <input type="text" id="pid" autocomplete="off" spellcheck="false">
+  <div class="error" id="pid-err"></div>
+  <button id="btn-start">Start Experiment</button>
+</div>
+
+<!-- Reading instructions -->
+<div id="s-reading-instr" class="screen">
+  <h1>Part 1: Reading</h1>
+  <div class="instr">
+    <p>This part measures your reading speed.</p>
+    <ol>
+      <li>A sentence appears. Read it carefully at your normal pace and press <kbd>SPACE</kbd> as soon as you have finished reading.</li>
+      <li>The sentence disappears and a single word appears.</li>
+      <li>Was that word in the sentence? Press <kbd>Y</kbd> for yes or <kbd>N</kbd> for no, as quickly and accurately as you can.</li>
+    </ol>
+    <p>Keep one finger on <kbd>Y</kbd> and one on <kbd>N</kbd>.</p>
+  </div>
+  <p class="press">Press <kbd>SPACE</kbd> to begin.</p>
+</div>
+
+<!-- Reading trial -->
+<div id="s-reading" class="screen">
+  <div id="rd-fix" class="fix" hidden>+</div>
+  <p id="rd-sentence" hidden></p>
+  <div id="rd-probe-wrap" hidden>
+    <p id="rd-probe"></p>
+    <p class="rd-hint">Was this word in the sentence? &nbsp; <kbd>Y</kbd> yes &nbsp; <kbd>N</kbd> no</p>
+  </div>
+  <p id="rd-hint" class="rd-hint" hidden>Press <kbd>SPACE</kbd> when you have finished reading.</p>
+</div>
+
+<!-- Block instructions (text filled in by script) -->
+<div id="s-block-instr" class="screen">
+  <h1 id="bi-title"></h1>
+  <div class="instr" id="bi-body"></div>
+  <p class="press">Press <kbd>SPACE</kbd> to begin.</p>
+</div>
+
+<!-- Blank / fixation between trials -->
+<div id="s-blank" class="screen"><div id="blank-fix" class="fix" hidden>+</div></div>
+
+<!-- Imagery prompt -->
+<div id="s-prompt" class="screen">
+  <p id="prompt-text"></p>
+  <p class="rd-hint">Picture this scene in your mind. Press <kbd>SPACE</kbd> when your image is clear.</p>
+</div>
+
+<!-- Vividness rating (two questions, keys 1-5) -->
+<div id="s-vivid" class="screen">
+  <p class="vivid-intro">Think back to the mental image you formed for this sentence.</p>
+  <p id="vivid-question"></p>
+  <div id="vivid-scale" class="scale"></div>
+  <p class="rd-hint">Press a number key from <kbd>1</kbd> to <kbd>5</kbd>.</p>
+</div>
+
+<!-- Interactive task -->
+<div id="s-task" class="screen">
+  <div id="task-label"></div>
+  <div id="task-stage"></div>
+  <div id="task-hint"></div>
+  <button id="btn-submit" disabled>Submit</button>
+</div>
+
+<!-- End / results -->
+<div id="s-end" class="screen">
+  <h1>Thank you!</h1>
+  <p>Here is a summary of your data.</p>
+  <h2>Reading baseline</h2>
+  <table id="tbl-reading"></table>
+  <h2>Imagery tasks</h2>
+  <table id="tbl-tasks"></table>
+  <p class="note">The <em>imagery &minus; motor</em> column estimates how long you spent translating your mental image into the picture, after subtracting the time it takes just to operate the controls.</p>
+  <button id="btn-download">Download Data (CSV)</button>
+  <p class="note" id="dl-msg"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ======================= Parameters =======================
+  // Timing (ms). Add ?debug=1 to the URL for a fast run-through.
+  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+  const FIX_MS     = DEBUG ? 100 : 500;    // fixation cross before each trial
+  const BLANK_MS   = DEBUG ? 100 : 500;    // blank between sentence offset and probe word
+  const ITI_MS     = DEBUG ? 100 : 700;    // blank after each trial
+  const LEAD_IN_MS = DEBUG ? 200 : 1000;   // blank before the first trial of a phase
+  // Debug mode runs only this many reading-baseline trials (half probe-present, half absent).
+  // Note: this is the one place where a debug run has fewer data rows than a real run.
+  const READING_DEBUG_N = 4;
+  // Ask the two vividness questions after every VIVID_EVERY-th imagery trial of each task.
+  const VIVID_EVERY = 2;
+  // Match (motor baseline) trials per task: all 3 in a real run, 1 in debug mode.
+  const MOTOR_N = DEBUG ? 1 : 3;
+  // Imagery trials per task: all 8 in a real run, 3 in debug mode.
+  const IMAGERY_N = DEBUG ? 3 : 8;
+
+  const EXP_NAME = "Lab7_VisualImagery";
+  const MOTOR_ACC_TOL = 0.04;              // motor baseline counts as accurate when error < this (normalised units)
+
+  // Slider ranges for the ripple task (logical canvas pixels).
+  const RADIUS_MIN = 10, RADIUS_MAX = 120; // inner radius = size of the impact
+  const GAP_MIN = 8, GAP_MAX = 60;         // spacing between successive rings
+
+  const TASK_INFO = {
+    projectile: { block_name: "A_projectile", title: "Throwing Curves" },
+    ripple:     { block_name: "B_ripple",     title: "Water Ripples" },
+    shadow:     { block_name: "C_shadow",     title: "Shadows" },
+  };
+
+  // ======================= Conditions =======================
+  // Mirror the CSV files in this folder: reading_conditions.csv, block_conditions.csv,
+  // motor_conditions.csv, imagery_conditions.csv.
+  const READING_CONDITIONS = [
+    ["The librarian stacked the returned books on the metal cart.", "cart", 1],
+    ["A small dog chased the red ball across the wet grass.", "cat", 0],
+    ["The teacher wrote the homework assignment on the whiteboard.", "homework", 1],
+    ["Fresh bread was cooling on the kitchen counter near the window.", "oven", 0],
+    ["The bus driver waited patiently at the crowded corner stop.", "driver", 1],
+    ["Two children built a tall sandcastle close to the water.", "bucket", 0],
+    ["The old clock in the hallway chimed twelve times at midnight.", "hallway", 1],
+    ["A gardener watered the roses early in the cool morning.", "tulips", 0],
+    ["The pilot announced that the plane would land in twenty minutes.", "plane", 1],
+    ["The mechanic replaced the worn tires on the delivery truck.", "engine", 0],
+    ["A waiter carried three plates of pasta to the corner table.", "pasta", 1],
+    ["The students lined up quietly outside the gymnasium door.", "cafeteria", 0],
+  ].map(([s, w, p]) => ({ reading_sentence: s, reading_probe: w, probe_present: p, probe_corr_key: p ? "y" : "n" }));
+
+  const BLOCK_CONDITIONS = [
+    { block_name: "A_projectile", task_type: "projectile" },
+    { block_name: "B_ripple",     task_type: "ripple" },
+    { block_name: "C_shadow",     task_type: "shadow" },
+  ];
+
+  // Motor-baseline targets. Projectile: landing (x1,y1) and peak (x2,y2) as fractions of the canvas.
+  // Ripple: slider values. Shadow: shadow tip offset from the object centre (x1,y1), fractions of canvas width.
+  const MOTOR_CONDITIONS = [
+    ["projectile", 0.80, 0.80, 0.45, 0.30, "", ""],
+    ["projectile", 0.55, 0.80, 0.33, 0.55, "", ""],
+    ["projectile", 0.90, 0.80, 0.50, 0.15, "", ""],
+    ["ripple", "", "", "", "", 30, 20],
+    ["ripple", "", "", "", "", 90, 45],
+    ["ripple", "", "", "", "", 50, 12],
+    ["shadow", 0.25, 0.05, "", "", "", ""],
+    ["shadow", -0.20, -0.15, "", "", "", ""],
+    ["shadow", 0.10, 0.25, "", "", "", ""],
+  ].map(([t, x1, y1, x2, y2, s1, s2]) => ({
+    task_type: t, target_x1: x1, target_y1: y1, target_x2: x2, target_y2: y2, target_slider_1: s1, target_slider_2: s2,
+  }));
+
+  const IMAGERY_CONDITIONS = [
+    ["projectile", "A heavy iron ball is lobbed gently over a short wall.", "force", "gentle", "arc", "high"],
+    ["projectile", "A baseball is fired in a hard, flat throw from the outfield to home plate.", "force", "hard", "arc", "low"],
+    ["projectile", "A tennis ball is tossed softly underhand to a child standing a few feet away.", "force", "gentle", "arc", "low"],
+    ["projectile", "A football is punted with full force high into the sky and far down the field.", "force", "hard", "arc", "high"],
+    ["projectile", "A water balloon is lobbed slowly and high over a tall fence into the next yard.", "force", "gentle", "arc", "high"],
+    ["projectile", "A flat stone is skipped hard and low across a calm pond.", "force", "hard", "arc", "low"],
+    ["projectile", "A crumpled ball of paper is flicked lightly into a wastebasket right beside the desk.", "force", "gentle", "arc", "low"],
+    ["projectile", "A javelin is launched with great force in a high soaring arc down the field.", "force", "hard", "arc", "high"],
+    ["ripple", "A tiny pebble is dropped gently into a calm pond.", "size", "small", "impact", "gentle"],
+    ["ripple", "A marble is thrown hard into a still swimming pool.", "size", "small", "impact", "hard"],
+    ["ripple", "A large beach ball is set down softly onto a quiet lake.", "size", "large", "impact", "gentle"],
+    ["ripple", "A heavy boulder crashes into a deep mountain lake.", "size", "large", "impact", "hard"],
+    ["ripple", "A single raindrop falls onto a smooth puddle.", "size", "small", "impact", "gentle"],
+    ["ripple", "A bullet strikes the surface of a full bathtub.", "size", "small", "impact", "hard"],
+    ["ripple", "A wide wooden plank is lowered slowly onto the surface of a pool.", "size", "large", "impact", "gentle"],
+    ["ripple", "A wide, flat sheet of steel slaps flat onto the surface of a still lake.", "size", "large", "impact", "hard"],
+    ["shadow", "A bright light bulb hangs low, one foot to the left of a tall cylinder.", "light_side", "left", "light_height", "low"],
+    ["shadow", "The afternoon sun shines from high up on the right side of a lone tree.", "light_side", "right", "light_height", "high"],
+    ["shadow", "A flashlight lying on the floor shines from the right at a tall vase.", "light_side", "right", "light_height", "low"],
+    ["shadow", "A streetlamp towers high above and to the left of a parked bicycle.", "light_side", "left", "light_height", "high"],
+    ["shadow", "The noon sun blazes almost directly overhead a tall flagpole.", "light_side", "overhead", "light_height", "high"],
+    ["shadow", "A candle sits on the table just to the right of a wine bottle.", "light_side", "right", "light_height", "low"],
+    ["shadow", "A ceiling lamp hangs high and slightly to the left of a wooden chair.", "light_side", "left", "light_height", "high"],
+    ["shadow", "The setting sun sits low on the horizon far to the left of a lighthouse.", "light_side", "left", "light_height", "low"],
+  ].map(([t, s, f1, l1, f2, l2]) => ({ task_type: t, stimulus: s, factor_1: f1, level_1: l1, factor_2: f2, level_2: l2 }));
+
+  // ======================= State =======================
+  let participantId = "";
+  let rows = [];          // one row per trial, all phases (PsychoPy-style long format)
+  let t0 = 0;             // experiment clock zero (performance.now() at Start)
+  let frameMs = 1000 / 60;
+  let expInfo = {};
+  let started = false;
+  let finished = false;
+
+  // ======================= Helpers =======================
+  const $ = (id) => document.getElementById(id);
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
+
+  // Frame-locked screen updates, like win.flip() in PsychoPy: fn() runs in the animation
+  // frame and the frame's timestamp is returned as the onset/offset time.
+  const flip = (fn) => new Promise((r) => requestAnimationFrame((t) => { if (fn) fn(); r(t); }));
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Blank screen, optionally with a fixation cross; returns the flip time.
+  const showBlank = (fix) => flip(() => { $("blank-fix").hidden = !fix; show("s-blank"); });
+
+  // Estimate the monitor refresh interval from 60 frames.
+  async function measureFrameRate() {
+    const ts = [];
+    for (let i = 0; i < 61; i++) ts.push(await flip());
+    const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b);
+    frameMs = d[Math.floor(d.length / 2)];
+    return 1000 / frameMs;
+  }
+
+  // Seconds on the experiment clock, rounded to 0.1 ms (PsychoPy logs times in seconds).
+  const sec = (t) => Math.round((t - t0) * 10) / 10000;
+  const durSec = (a, b) => Math.round((b - a) * 10) / 10000;
+  const r4 = (v) => Math.round(v * 10000) / 10000;
+  // Event timestamps share the performance.now() clock and are closer to the real input event.
+  const evT = (e) => (e.timeStamp > 0 ? e.timeStamp : performance.now());
+
+  function pad(n, w = 2) { return String(n).padStart(w, "0"); }
+
+  // PsychoPy date format: 2026-10-07_09h54.12.345
+  function psychopyDate(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" +
+      pad(d.getHours()) + "h" + pad(d.getMinutes()) + "." + pad(d.getSeconds()) + "." + pad(d.getMilliseconds(), 3);
+  }
+
+  // Random 6-digit default participant ID, as in PsychoPy Builder.
+  function randomParticipantId() {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+    return pad(n, 6);
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  const randBetween = (lo, hi) => lo + Math.random() * (hi - lo);
+
+  function keyName(e) {
+    if (e.code === "KeyY") return "y";
+    if (e.code === "KeyN") return "n";
+    if (e.code === "Space") return " ";
+    const m = /^(?:Digit|Numpad)([1-5])$/.exec(e.code || "");
+    if (m) return m[1];
+    return (e.key || "").toLowerCase();
+  }
+
+  // Resolve with { key, t } on the first allowed keypress; the listener removes itself.
+  function waitForKey(allowed) {
+    return new Promise((resolve) => {
+      function onKey(e) {
+        if (e.repeat) return;
+        const k = keyName(e);
+        if (!allowed.includes(k)) return;
+        e.preventDefault();
+        document.removeEventListener("keydown", onKey);
+        resolve({ key: k, t: evT(e) });
+      }
+      document.addEventListener("keydown", onKey);
+    });
+  }
+
+  // Resolve with the click timestamp when the Submit button is pressed (once).
+  function waitForSubmit() {
+    return new Promise((resolve) => {
+      const btn = $("btn-submit");
+      function onClick(e) {
+        if (btn.disabled) return;
+        btn.removeEventListener("click", onClick);
+        btn.disabled = true;
+        resolve(evT(e));
+      }
+      btn.addEventListener("click", onClick);
+    });
+  }
+
+  // ======================= Canvas helpers =======================
+  // Canvases have a fixed logical size (W x H) and are drawn at device resolution.
+  function makeCanvas(W, H) {
+    const c = document.createElement("canvas");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    c.width = Math.round(W * dpr);
+    c.height = Math.round(H * dpr);
+    c.style.aspectRatio = W + " / " + H;
+    c.logicalW = W;
+    c.logicalH = H;
+    const ctx = c.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.ctx = ctx;
+    return c;
+  }
+
+  // Pointer position in logical canvas coordinates.
+  function canvasPos(c, e) {
+    const r = c.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(c.logicalW, (e.clientX - r.left) * c.logicalW / r.width)),
+      y: Math.max(0, Math.min(c.logicalH, (e.clientY - r.top) * c.logicalH / r.height)),
+    };
+  }
+
+  function circle(ctx, x, y, r, fill, stroke, lw = 2) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+  }
+
+  // A captioned canvas panel (TARGET / YOURS) for the match trials.
+  function makePanel(stage, caption, W, H) {
+    const wrap = document.createElement("div"); wrap.className = "panel";
+    const cap = document.createElement("div"); cap.className = "cap"; cap.textContent = caption;
+    const c = makeCanvas(W, H);
+    wrap.appendChild(cap); wrap.appendChild(c); stage.appendChild(wrap);
+    return c;
+  }
+
+  function crossMark(ctx, x, y, s, color, lw = 3) {
+    ctx.strokeStyle = color; ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s);
+    ctx.moveTo(x - s, y + s); ctx.lineTo(x + s, y - s);
+    ctx.stroke();
+  }
+
+  // ======================= Task A: projectile curves =======================
+  // Two clicks: landing point, then the highest point of the flight. The quadratic Bezier
+  // is chosen so that it passes through the peak click at t = 0.5.
+  class ProjectileTask {
+    constructor(stage, opts) {
+      this.W = 800; this.H = 450;
+      this.mode = opts.mode;
+      this.target = opts.target || null;   // { land:{x,y}, peak:{x,y} } in logical px
+      this.onChange = opts.onChange;
+      this.origin = { x: 0.10 * this.W, y: 0.74 * this.H };
+      this.groundY = 0.80 * this.H;
+      this.land = null; this.peak = null; this.clicks = [];
+      // Match trials show the target on the left and the participant's canvas on the right.
+      // Both are displayed at about half size, so markers and text are drawn larger (k).
+      this.k = this.target ? 1.6 : 1;
+      if (this.target) {
+        this.targetCanvas = makePanel(stage, "TARGET", this.W, this.H);
+        this.canvas = makePanel(stage, "YOURS", this.W, this.H);
+        this.targetCanvas.style.cursor = "default";
+      } else {
+        this.canvas = makeCanvas(this.W, this.H);
+        stage.appendChild(this.canvas);
+      }
+      this.canvas.addEventListener("pointerdown", (e) => this.click(e));
+      this.draw();
+    }
+    click(e) {
+      e.preventDefault();
+      const p = canvasPos(this.canvas, e);
+      const t = evT(e);
+      if (!this.land || this.peak) { this.land = p; this.peak = null; this.clicks = [{ ...p, t }]; }
+      else { this.peak = p; this.clicks.push({ ...p, t }); }
+      this.draw();
+      this.onChange({ complete: !!this.peak, t });
+    }
+    hint() {
+      if (!this.land) return this.mode === "motor" ? "Click where the TARGET curve lands (X)." : "Click where the object lands.";
+      if (!this.peak) return this.mode === "motor" ? "Now click where the TARGET curve peaks (circle)." : "Now click the highest point of its flight.";
+      return "Click Submit, or click the canvas again to start over.";
+    }
+    control(p0, m, p2) { return { x: 2 * m.x - (p0.x + p2.x) / 2, y: 2 * m.y - (p0.y + p2.y) / 2 }; }
+    drawArc(ctx, land, peak, color) {
+      const c = this.control(this.origin, peak, land);
+      ctx.save();
+      ctx.strokeStyle = color; ctx.lineWidth = 3 * this.k;
+      ctx.beginPath();
+      ctx.moveTo(this.origin.x, this.origin.y);
+      ctx.quadraticCurveTo(c.x, c.y, land.x, land.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    draw() {
+      if (this.targetCanvas) this.drawScene(this.targetCanvas.ctx, this.target.land, this.target.peak);
+      this.drawScene(this.canvas.ctx, this.land, this.peak);
+    }
+    // Draw the scene with a landing point and peak (either may be null).
+    drawScene(ctx, land, peak) {
+      const W = this.W, H = this.H, k = this.k;
+      // Sky and ground.
+      ctx.fillStyle = "#5d6b78"; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#4b5a3e"; ctx.fillRect(0, this.groundY, W, H - this.groundY);
+      ctx.strokeStyle = "#dfe6d9"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, this.groundY); ctx.lineTo(W, this.groundY); ctx.stroke();
+      // Thrower: a simple stick figure with the throwing hand at the origin.
+      const fx = 0.06 * W, fy = this.groundY;
+      ctx.strokeStyle = "#f4f4f4"; ctx.lineWidth = 3; ctx.lineCap = "round";
+      circle(ctx, fx, fy - 70, 11, null, "#f4f4f4", 3);
+      ctx.beginPath();
+      ctx.moveTo(fx, fy - 59); ctx.lineTo(fx, fy - 25);          // body
+      ctx.moveTo(fx, fy - 25); ctx.lineTo(fx - 12, fy);           // legs
+      ctx.moveTo(fx, fy - 25); ctx.lineTo(fx + 12, fy);
+      ctx.moveTo(fx, fy - 52); ctx.lineTo(this.origin.x, this.origin.y); // throwing arm
+      ctx.stroke();
+      circle(ctx, this.origin.x, this.origin.y, 6, "#f4f4f4");
+      ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = Math.round(15 * k) + "px Arial"; ctx.textAlign = "left";
+      ctx.fillText("thrower", fx - 24, fy + 18 + 6 * k);
+      // Landing marker, then the arc and peak marker.
+      if (land) crossMark(ctx, land.x, land.y, 10 * k, "#ffd166", 3 * k);
+      if (land && peak) {
+        this.drawArc(ctx, land, peak, "#ffd166");
+        circle(ctx, peak.x, peak.y, 7 * k, "#ffd166");
+      }
+    }
+    response() {
+      const W = this.W, H = this.H, r = {};
+      if (this.land) {
+        r.response_x = r4(this.land.x / W); r.response_y = r4(this.land.y / H);
+        r.response_px_x = Math.round(this.land.x); r.response_px_y = Math.round(this.land.y);
+        r.click1_x = r.response_x; r.click1_y = r.response_y;
+      }
+      if (this.peak) { r.click2_x = r4(this.peak.x / W); r.click2_y = r4(this.peak.y / H); }
+      if (this.target && this.land && this.peak) {
+        const d1 = Math.hypot((this.land.x - this.target.land.x) / W, (this.land.y - this.target.land.y) / H);
+        const d2 = Math.hypot((this.peak.x - this.target.peak.x) / W, (this.peak.y - this.target.peak.y) / H);
+        r.motor_target_error = r4((d1 + d2) / 2);
+      }
+      r.canvas_w = W; r.canvas_h = H;
+      return r;
+    }
+    clickTimes() { return this.clicks.map((c) => c.t); }
+  }
+
+  // ======================= Task B: water ripples =======================
+  function drawRipple(ctx, w, h, inner, gap) {
+    ctx.fillStyle = "#2f4858"; ctx.fillRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2, maxR = Math.hypot(w, h) / 2;
+    // Impact zone: a brighter disc inside the first ring.
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, inner);
+    g.addColorStop(0, "rgba(220,240,255,0.55)");
+    g.addColorStop(1, "rgba(220,240,255,0.05)");
+    circle(ctx, cx, cy, inner, g);
+    // Rings, fading with distance from the impact.
+    for (let r = inner; r < maxR; r += gap) {
+      const f = (r - inner) / (maxR - inner);
+      ctx.strokeStyle = "rgba(220,240,255," + (0.95 * (1 - f) + 0.05).toFixed(3) + ")";
+      ctx.lineWidth = 3 - 2 * f;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  class RippleTask {
+    constructor(stage, opts) {
+      this.mode = opts.mode;
+      this.target = opts.target || null;   // { radius, gap }
+      this.onChange = opts.onChange;
+      this.interacted = false;
+      this.start = {
+        radius: Math.round(randBetween(RADIUS_MIN, RADIUS_MAX)),
+        gap: Math.round(randBetween(GAP_MIN, GAP_MAX)),
+      };
+      if (this.target) {
+        this.W = 440; this.H = 360;
+        this.targetCanvas = makePanel(stage, "TARGET", this.W, this.H);
+        this.canvas = makePanel(stage, "YOURS", this.W, this.H);
+        drawRipple(this.targetCanvas.ctx, this.W, this.H, this.target.radius, this.target.gap);
+      } else {
+        this.W = 800; this.H = 400;
+        this.canvas = makeCanvas(this.W, this.H);
+        stage.appendChild(this.canvas);
+      }
+      this.canvas.style.cursor = "default";
+      const box = document.createElement("div");
+      box.className = "sliders";
+      this.s1 = this.slider(box, "Impact size", RADIUS_MIN, RADIUS_MAX, this.start.radius);
+      this.s2 = this.slider(box, "Ripple spacing", GAP_MIN, GAP_MAX, this.start.gap);
+      stage.appendChild(box);
+      this.draw();
+    }
+    slider(box, text, min, max, value) {
+      const lab = document.createElement("label");
+      lab.textContent = text;
+      const inp = document.createElement("input");
+      inp.type = "range"; inp.min = min; inp.max = max; inp.step = 1; inp.value = value;
+      inp.addEventListener("input", (e) => {
+        this.interacted = true;
+        this.draw();
+        this.onChange({ complete: true, t: evT(e) });
+      });
+      lab.appendChild(inp); box.appendChild(lab);
+      return inp;
+    }
+    hint() { return this.target ? "Move the sliders until YOURS matches the TARGET, then click Submit." : "Adjust the two sliders to match your mental image, then click Submit."; }
+    draw() { drawRipple(this.canvas.ctx, this.W, this.H, +this.s1.value, +this.s2.value); }
+    response() {
+      const r = { slider_1: +this.s1.value, slider_2: +this.s2.value, start_slider_1: this.start.radius, start_slider_2: this.start.gap, canvas_w: this.W, canvas_h: this.H };
+      if (this.target) {
+        r.motor_target_error = r4((Math.abs(r.slider_1 - this.target.radius) / (RADIUS_MAX - RADIUS_MIN) +
+                                   Math.abs(r.slider_2 - this.target.gap) / (GAP_MAX - GAP_MIN)) / 2);
+      }
+      return r;
+    }
+  }
+
+  // ======================= Task C: shadows =======================
+  // Top-down view. The object is a disc at the centre; the shadow is a dark band from the
+  // object to a draggable tip. Direction of the tip = direction of the shadow, length = its length.
+  class ShadowTask {
+    constructor(stage, opts) {
+      this.W = 800; this.H = 450;
+      this.mode = opts.mode;
+      this.target = opts.target || null;   // { dx, dy } tip offset in logical px
+      this.onChange = opts.onChange;
+      this.obj = { x: this.W / 2, y: this.H / 2 + 10, r: 30 };
+      const a = randBetween(0, Math.PI * 2), len = randBetween(70, 130);
+      this.tip = { x: this.obj.x + Math.cos(a) * len, y: this.obj.y + Math.sin(a) * len };
+      this.start = { ...this.tip };
+      this.dragging = false; this.grab = { x: 0, y: 0 }; this.interacted = false;
+      this.k = this.target ? 1.6 : 1;
+      if (this.target) {
+        this.targetCanvas = makePanel(stage, "TARGET", this.W, this.H);
+        this.canvas = makePanel(stage, "YOURS", this.W, this.H);
+        this.targetCanvas.style.cursor = "default";
+      } else {
+        this.canvas = makeCanvas(this.W, this.H);
+        stage.appendChild(this.canvas);
+      }
+      this.canvas.style.cursor = "grab";
+      this.canvas.addEventListener("pointerdown", (e) => this.down(e));
+      this.canvas.addEventListener("pointermove", (e) => this.move(e));
+      this.canvas.addEventListener("pointerup", (e) => this.up(e));
+      this.canvas.addEventListener("pointercancel", (e) => this.up(e));
+      this.draw();
+    }
+    // Distance from p to the segment object-centre -> tip.
+    distToShadow(p) {
+      const o = this.obj, t = this.tip, dx = t.x - o.x, dy = t.y - o.y, L2 = dx * dx + dy * dy;
+      let u = L2 > 0 ? ((p.x - o.x) * dx + (p.y - o.y) * dy) / L2 : 0;
+      u = Math.max(0, Math.min(1, u));
+      return Math.hypot(p.x - (o.x + u * dx), p.y - (o.y + u * dy));
+    }
+    down(e) {
+      e.preventDefault();
+      const p = canvasPos(this.canvas, e);
+      if (this.distToShadow(p) > this.obj.r + 12) return;
+      this.dragging = true;
+      this.grab = { x: this.tip.x - p.x, y: this.tip.y - p.y };
+      try { this.canvas.setPointerCapture(e.pointerId); } catch (_) { /* pointer already gone */ }
+      this.canvas.style.cursor = "grabbing";
+      if (!this.interacted) { this.interacted = true; this.onChange({ complete: false, t: evT(e) }); }
+    }
+    move(e) {
+      if (!this.dragging) return;
+      const p = canvasPos(this.canvas, e);
+      this.tip = {
+        x: Math.max(0, Math.min(this.W, p.x + this.grab.x)),
+        y: Math.max(0, Math.min(this.H, p.y + this.grab.y)),
+      };
+      this.draw();
+    }
+    up(e) {
+      if (!this.dragging) return;
+      this.dragging = false;
+      this.canvas.style.cursor = "grab";
+      this.draw();
+      this.onChange({ complete: true, t: evT(e) });
+    }
+    hint() {
+      return this.target ? "Drag the shadow in YOURS so it matches the TARGET, then click Submit."
+                         : "Drag the shadow to where your mental image puts it, then click Submit.";
+    }
+    shadowPath(ctx, tip) {
+      const o = this.obj, r = o.r, dx = tip.x - o.x, dy = tip.y - o.y, L = Math.hypot(dx, dy);
+      const ux = L > 0 ? dx / L : 1, uy = L > 0 ? dy / L : 0, nx = -uy, ny = ux;
+      const ang = Math.atan2(uy, ux);
+      ctx.beginPath();
+      ctx.moveTo(o.x + nx * r, o.y + ny * r);
+      ctx.lineTo(tip.x + nx * r, tip.y + ny * r);
+      ctx.arc(tip.x, tip.y, r, ang + Math.PI / 2, ang - Math.PI / 2, true);
+      ctx.lineTo(o.x - nx * r, o.y - ny * r);
+      ctx.arc(o.x, o.y, r, ang - Math.PI / 2, ang + Math.PI / 2, true);
+      ctx.closePath();
+    }
+    draw() {
+      if (this.targetCanvas) {
+        const o = this.obj;
+        this.drawScene(this.targetCanvas.ctx, { x: o.x + this.target.dx, y: o.y + this.target.dy }, false);
+      }
+      this.drawScene(this.canvas.ctx, this.tip, true);
+    }
+    // Draw the floor, the shadow ending at `tip`, and the object; the handle only on the participant's canvas.
+    drawScene(ctx, tip, withHandle) {
+      const W = this.W, H = this.H, o = this.obj, k = this.k;
+      // Floor, seen from above.
+      ctx.fillStyle = "#9a948a"; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = 0; y <= H; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = Math.round(14 * k) + "px Arial";
+      ctx.textAlign = "left"; ctx.fillText("LEFT", 12, 10 + 12 * k);
+      ctx.textAlign = "right"; ctx.fillText("RIGHT", W - 12, 10 + 12 * k);
+      ctx.textAlign = "center"; ctx.fillText("VIEW FROM ABOVE", W / 2, 10 + 12 * k);
+      // Shadow, then the object on top of it.
+      this.shadowPath(ctx, tip);
+      ctx.fillStyle = "rgba(20,20,30,0.62)"; ctx.fill();
+      circle(ctx, o.x, o.y, o.r, "#dcdcdc", "#f8f8f8", 3);
+      ctx.fillStyle = "#555"; ctx.font = Math.round(13 * k) + "px Arial"; ctx.textAlign = "center";
+      ctx.fillText("object", o.x, o.y + 5 * k);
+      // Drag handle at the shadow tip.
+      if (withHandle) circle(ctx, tip.x, tip.y, 7 * k, "#ffd166", "#5a4300", 2);
+    }
+    response() {
+      const W = this.W, H = this.H, o = this.obj, t = this.tip;
+      const dx = t.x - o.x, dy = t.y - o.y;
+      const r = {
+        response_x: r4(t.x / W), response_y: r4(t.y / H),
+        response_px_x: Math.round(t.x), response_px_y: Math.round(t.y),
+        shadow_dx: r4(dx / W), shadow_dy: r4(dy / W),
+        shadow_angle_deg: Math.round(Math.atan2(-dy, dx) * 180 / Math.PI * 10) / 10,   // 0 = right, 90 = up
+        shadow_distance: r4(Math.hypot(dx, dy) / W),
+        start_x: r4(this.start.x / W), start_y: r4(this.start.y / H),
+        canvas_w: W, canvas_h: H,
+      };
+      if (this.target) r.motor_target_error = r4(Math.hypot(dx - this.target.dx, dy - this.target.dy) / W);
+      return r;
+    }
+  }
+
+  const TASK_CLASS = { projectile: ProjectileTask, ripple: RippleTask, shadow: ShadowTask };
+
+  // Convert a motor_conditions row into logical-pixel targets for the task.
+  function motorTarget(task, cond) {
+    if (task === "projectile") {
+      return { land: { x: cond.target_x1 * 800, y: cond.target_y1 * 450 }, peak: { x: cond.target_x2 * 800, y: cond.target_y2 * 450 } };
+    }
+    if (task === "ripple") return { radius: cond.target_slider_1, gap: cond.target_slider_2 };
+    return { dx: cond.target_x1 * 800, dy: cond.target_y1 * 800 };
+  }
+
+  // ======================= Generic interactive trial =======================
+  // spec: { phase, trialType, pre, taskType, mode, stimulus, target, label, condRow, loop, blockInfo }
+  async function runInteractiveTrial(spec) {
+    const pre = spec.pre;
+    const row = {
+      ...spec.condRow, ...spec.loop, ...spec.blockInfo,
+      participant_id: participantId, phase: spec.phase, trial_type: spec.trialType,
+      task_type: spec.taskType, stimulus: spec.stimulus || "",
+    };
+
+    // Fixation.
+    const tFix = await showBlank(true);
+    row[pre + "_trial.started"] = sec(tFix);
+    if (pre !== "tutorial") row[pre + "_fix.started"] = sec(tFix);
+    await wait(FIX_MS);
+
+    // Imagery trials: read the sentence and form the image first (self-paced).
+    if (spec.mode === "imagery") {
+      $("prompt-text").textContent = spec.stimulus;
+      const tOn = await flip(() => show("s-prompt"));
+      row["imagery_fix.stopped"] = sec(tOn);
+      row["imagery_prompt.started"] = sec(tOn);
+      row["key_imagined.started"] = sec(tOn);
+      const k = await waitForKey([" "]);
+      row["key_imagined.keys"] = "space";
+      row["key_imagined.rt"] = durSec(tOn, k.t);
+    }
+
+    // Build the task UI while the screen is hidden, then flip to it.
+    const stage = $("task-stage");
+    stage.innerHTML = "";
+    $("btn-submit").disabled = true;
+    $("task-label").textContent = spec.label;
+    let firstT = null;
+    const task = new TASK_CLASS[spec.taskType](stage, {
+      mode: spec.mode, target: spec.target,
+      onChange: ({ complete, t }) => {
+        if (firstT === null) firstT = t;
+        $("btn-submit").disabled = !complete;
+        $("task-hint").textContent = task.hint();
+      },
+    });
+    $("task-hint").textContent = task.hint();
+    const submitP = waitForSubmit();
+    const tCanvas = await flip(() => show("s-task"));
+    if (spec.mode === "imagery") row["imagery_prompt.stopped"] = sec(tCanvas);
+    else if (pre !== "tutorial") row[pre + "_fix.stopped"] = sec(tCanvas);
+    row[pre + "_canvas.started"] = sec(tCanvas);
+
+    const tSubmit = await submitP;
+    row[pre + "_mouse.first_rt"] = firstT === null ? "" : durSec(tCanvas, firstT);
+    row[pre + "_submit.rt"] = durSec(tCanvas, tSubmit);
+    row.rt = row[pre + "_submit.rt"];
+    Object.assign(row, task.response());
+    if (task.clickTimes) {
+      const ct = task.clickTimes();
+      if (ct[0] !== undefined) row.click1_rt = durSec(tCanvas, ct[0]);
+      if (ct[1] !== undefined) row.click2_rt = durSec(tCanvas, ct[1]);
+    }
+    if (spec.mode === "motor") row.accuracy = row.motor_target_error < MOTOR_ACC_TOL ? 1 : 0;
+
+    if (spec.vividness) {
+      // Vividness routine right after the response, while the image is still fresh.
+      const tOff = await flip(() => { showVividQuestion(0); show("s-vivid"); });
+      row[pre + "_canvas.stopped"] = sec(tOff);
+      stage.innerHTML = "";
+      await askVividness(row, tOff);
+    } else {
+      const tOff = await showBlank(false);
+      row[pre + "_canvas.stopped"] = sec(tOff);
+      stage.innerHTML = "";
+    }
+    await wait(ITI_MS);
+    row[pre + "_trial.stopped"] = sec(performance.now());
+    rows.push(row);
+  }
+
+  // ======================= Vividness questions =======================
+  // Two 5-point ratings modelled on the VVIQ (Marks, 1973): vividness and amount of detail.
+  const VIVID_QUESTIONS = [
+    {
+      name: "vivid_q1", column: "vividness",
+      text: "How vivid was your mental image of this scene?",
+      anchors: [
+        "No image at all; I only “knew” I was thinking about the scene",
+        "Vague and dim",
+        "Moderately clear and vivid",
+        "Clear and reasonably vivid",
+        "Perfectly clear and as vivid as real seeing",
+      ],
+    },
+    {
+      name: "vivid_q2", column: "image_detail",
+      text: "How much detail did your mental image contain?",
+      anchors: [
+        "No detail, just a general sense of the scene",
+        "A few details",
+        "Some details",
+        "Many details",
+        "Rich detail in every part of the scene",
+      ],
+    },
+  ];
+
+  function showVividQuestion(i) {
+    const q = VIVID_QUESTIONS[i];
+    $("vivid-question").textContent = q.text;
+    $("vivid-scale").innerHTML = q.anchors
+      .map((a, k) => "<kbd>" + (k + 1) + "</kbd><span>" + a + "</span>").join("");
+  }
+
+  // Ask both questions in turn; tStart is the flip time of the first question (already on screen).
+  async function askVividness(row, tStart) {
+    row["vividness.started"] = sec(tStart);
+    let tOn = tStart;
+    for (let i = 0; i < VIVID_QUESTIONS.length; i++) {
+      const q = VIVID_QUESTIONS[i];
+      if (i > 0) tOn = await flip(() => showVividQuestion(i));
+      row[q.name + ".started"] = sec(tOn);
+      const k = await waitForKey(["1", "2", "3", "4", "5"]);
+      row[q.name + ".keys"] = k.key;
+      row[q.name + ".rt"] = durSec(tOn, k.t);
+      row[q.column] = +k.key;
+    }
+    const tEnd = await showBlank(false);
+    row["vividness.stopped"] = sec(tEnd);
+  }
+
+  // ======================= Tutorial (one practice trial at the start of each block) =======================
+  const TUTORIAL_LABEL = {
+    projectile: "Practice: someone throws a ball. Click where it lands, then click the highest point of its flight. A curve will be drawn for you.",
+    ripple: "Practice: something has just dropped into the water. Move the sliders to change the size of the splash and the spacing of the rings.",
+    shadow: "Practice: you are looking down on an object from above. Drag the dark shadow (or its yellow handle) to change its direction and length.",
+  };
+
+  // ======================= Reading baseline =======================
+  async function runReading() {
+    show("s-reading-instr");
+    await waitForKey([" "]);
+    await showBlank(false);
+    await wait(LEAD_IN_MS);
+
+    let order = shuffle(READING_CONDITIONS.map((c, i) => i));
+    if (DEBUG) {
+      // Fast run-through: a balanced subset of present / absent probes.
+      const half = Math.ceil(READING_DEBUG_N / 2);
+      order = shuffle(order.filter((i) => READING_CONDITIONS[i].probe_present === 1).slice(0, half)
+        .concat(order.filter((i) => READING_CONDITIONS[i].probe_present === 0).slice(0, READING_DEBUG_N - half)));
+    }
+    const fix = $("rd-fix"), sent = $("rd-sentence"), probe = $("rd-probe-wrap"), hint = $("rd-hint");
+    for (let n = 0; n < order.length; n++) {
+      const cond = READING_CONDITIONS[order[n]];
+      const row = {
+        ...cond, participant_id: participantId, phase: "reading", trial_type: "reading_baseline", task_type: "reading",
+        stimulus: cond.reading_sentence, block_name: "",
+        "reading_trials.thisRepN": 0, "reading_trials.thisTrialN": n, "reading_trials.thisN": n, "reading_trials.thisIndex": order[n],
+      };
+      // Fixation.
+      const tFix = await flip(() => { fix.hidden = false; sent.hidden = true; probe.hidden = true; hint.hidden = true; show("s-reading"); });
+      row["reading_trial.started"] = sec(tFix);
+      row["reading_fix.started"] = sec(tFix);
+      await wait(FIX_MS);
+      // Sentence, self-paced.
+      sent.textContent = cond.reading_sentence;
+      const tSent = await flip(() => { fix.hidden = true; sent.hidden = false; hint.hidden = false; });
+      row["reading_fix.stopped"] = sec(tSent);
+      row["sentence_text.started"] = sec(tSent);
+      row["key_sentence.started"] = sec(tSent);
+      const k1 = await waitForKey([" "]);
+      row["key_sentence.keys"] = "space";
+      row["key_sentence.rt"] = durSec(tSent, k1.t);
+      const tBlank = await flip(() => { sent.hidden = true; hint.hidden = true; });
+      row["sentence_text.stopped"] = sec(tBlank);
+      await wait(BLANK_MS);
+      // Probe word.
+      $("rd-probe").textContent = cond.reading_probe;
+      const tProbe = await flip(() => { probe.hidden = false; });
+      row["probe_text.started"] = sec(tProbe);
+      row["key_probe.started"] = sec(tProbe);
+      const k2 = await waitForKey(["y", "n"]);
+      row["key_probe.keys"] = k2.key;
+      row["key_probe.rt"] = durSec(tProbe, k2.t);
+      row["key_probe.corr"] = k2.key === cond.probe_corr_key ? 1 : 0;
+      row.rt = row["key_probe.rt"];
+      row.accuracy = row["key_probe.corr"];
+      const tOff = await showBlank(false);
+      row["probe_text.stopped"] = sec(tOff);
+      await wait(ITI_MS);
+      row["reading_trial.stopped"] = sec(performance.now());
+      rows.push(row);
+    }
+  }
+
+  // ======================= Experimental blocks =======================
+  // Instruction text per block: [tool description, match-trial text, imagery-trial text].
+  const BLOCK_INSTR = {
+    projectile: {
+      tool: `<p>In this block you will draw <strong>throwing curves</strong>. Click where the thrown object lands, then click the highest point of its flight, and a curve is drawn from the thrower to the landing spot. Click <strong>Submit</strong> when you are done, or click again to start over.</p>
+             <p>Let's practise once first.</p>`,
+      match: `<p>Now the <strong>matching trials</strong>. A TARGET curve is shown on the left. On the right, click where the target curve lands (<strong>X</strong>) and where it peaks (<strong>circle</strong>) so your curve matches the target, then Submit, <em>as fast and accurately as you can</em>.</p>`,
+      imagery: `<p>A sentence describes someone throwing an object. Picture the throw, press <kbd>SPACE</kbd>, then click where the object lands and the highest point of its flight so the curve matches your mental image.</p>`,
+    },
+    ripple: {
+      tool: `<p>In this block you will set <strong>water ripples</strong>. Two sliders control the picture: <strong>impact size</strong> (the size of the splash) and <strong>ripple spacing</strong> (the gap between rings). Click <strong>Submit</strong> when you are done.</p>
+             <p>Let's practise once first.</p>`,
+      match: `<p>Now the <strong>matching trials</strong>. A TARGET ripple pattern is shown on the left. Move the two sliders until YOURS, on the right, matches the target, then Submit, <em>as fast and accurately as you can</em>.</p>`,
+      imagery: `<p>A sentence describes an object hitting water. Picture the splash, press <kbd>SPACE</kbd>, then set the impact size and ripple spacing to match your mental image.</p>`,
+    },
+    shadow: {
+      tool: `<p>In this block you will place <strong>shadows</strong>. You look down on an object from above. Drag the dark shadow (or its yellow handle) to change the shadow's direction and length. Click <strong>Submit</strong> when you are done.</p>
+             <p>Let's practise once first.</p>`,
+      match: `<p>Now the <strong>matching trials</strong>. A TARGET shadow is shown on the left. Drag the shadow on the right so it matches the target, then Submit, <em>as fast and accurately as you can</em>.</p>`,
+      imagery: `<p>A sentence describes a light shining on an object. Picture the scene from above, press <kbd>SPACE</kbd>, then drag the shadow so its direction and length match your mental image.</p>`,
+    },
+  };
+
+  async function blockScreen(title, html) {
+    $("bi-title").textContent = title;
+    $("bi-body").innerHTML = html;
+    show("s-block-instr");
+    await waitForKey([" "]);
+    await showBlank(false);
+    await wait(LEAD_IN_MS);
+  }
+
+  async function runBlocks(order) {
+    for (let b = 0; b < order.length; b++) {
+      const task = order[b];
+      const bIndex = BLOCK_CONDITIONS.findIndex((c) => c.task_type === task);
+      const info = TASK_INFO[task];
+      const blockInfo = {
+        block_name: info.block_name,
+        "blocks.thisRepN": 0, "blocks.thisTrialN": b, "blocks.thisN": b, "blocks.thisIndex": bIndex,
+      };
+      const title = "Block " + (b + 1) + " of 3: " + info.title;
+      const instr = BLOCK_INSTR[task];
+
+      // 1. Tutorial: one practice trial with this block's tool.
+      await blockScreen(title, instr.tool);
+      await runInteractiveTrial({
+        phase: "tutorial", trialType: "tutorial", pre: "tutorial", taskType: task, mode: "tutorial",
+        stimulus: "", target: null, label: TUTORIAL_LABEL[task],
+        condRow: {}, loop: { "tutorial_trials.thisN": 0 }, blockInfo,
+      });
+
+      // 2. Match trials (motor baseline): target on the left, participant's canvas on the right.
+      await blockScreen(title, instr.match);
+      const motorIdx = shuffle(MOTOR_CONDITIONS.map((c, i) => i).filter((i) => MOTOR_CONDITIONS[i].task_type === task)).slice(0, MOTOR_N);
+      for (let n = 0; n < motorIdx.length; n++) {
+        const cond = MOTOR_CONDITIONS[motorIdx[n]];
+        await runInteractiveTrial({
+          phase: "motor_baseline", trialType: "motor_baseline", pre: "motor", taskType: task, mode: "motor",
+          stimulus: "", target: motorTarget(task, cond),
+          label: "Matching trial: make YOURS match the TARGET as fast and accurately as you can.",
+          condRow: cond, blockInfo,
+          loop: { "motor_trials.thisRepN": 0, "motor_trials.thisTrialN": n, "motor_trials.thisN": n, "motor_trials.thisIndex": motorIdx[n] },
+        });
+      }
+
+      // 3. Imagery trials.
+      await blockScreen(title,
+        "<p>Now the <strong>imagination trials</strong>.</p>" + instr.imagery +
+        "<p>Read each sentence and form a clear mental image before you press <kbd>SPACE</kbd>. There are no right or wrong answers; take the time you need to make the picture match your image.</p>" +
+        "<p>After some trials you will be asked two short questions about how <strong>vivid</strong> and how <strong>detailed</strong> your mental image was. Answer with the number keys <kbd>1</kbd> to <kbd>5</kbd>.</p>");
+
+      // Main imagery trials for this task.
+      const imIdx = shuffle(IMAGERY_CONDITIONS.map((c, i) => i).filter((i) => IMAGERY_CONDITIONS[i].task_type === task)).slice(0, IMAGERY_N);
+      for (let n = 0; n < imIdx.length; n++) {
+        const cond = IMAGERY_CONDITIONS[imIdx[n]];
+        await runInteractiveTrial({
+          phase: "imagery", trialType: "imagery_main", pre: "imagery", taskType: task, mode: "imagery",
+          stimulus: cond.stimulus, target: null, label: cond.stimulus,
+          vividness: (n + 1) % VIVID_EVERY === 0,
+          condRow: cond, blockInfo,
+          loop: { "imagery_trials.thisRepN": 0, "imagery_trials.thisTrialN": n, "imagery_trials.thisN": n, "imagery_trials.thisIndex": imIdx[n] },
+        });
+      }
+    }
+  }
+
+  // ======================= Results =======================
+  const mean = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN);
+  const fmt = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "-");
+
+  function showResults() {
+    const rd = rows.filter((r) => r.trial_type === "reading_baseline");
+    const acc = mean(rd.map((r) => r.accuracy)) * 100;
+    $("tbl-reading").innerHTML =
+      "<tr><th>Measure</th><th>Value</th></tr>" +
+      "<tr><td class='lbl'>Probe accuracy</td><td class='num'>" + fmt(acc, 0) + " %</td></tr>" +
+      "<tr><td class='lbl'>Mean reading time per sentence</td><td class='num'>" + fmt(mean(rd.map((r) => r["key_sentence.rt"]))) + " s</td></tr>" +
+      "<tr><td class='lbl'>Mean probe RT</td><td class='num'>" + fmt(mean(rd.map((r) => r["key_probe.rt"]))) + " s</td></tr>";
+
+    let html = "<tr><th>Task</th><th>Motor RT (s)</th><th>Motor error</th><th>Time to form image (s)</th><th>Imagery RT (s)</th><th>Imagery &minus; motor (s)</th><th>Vividness (1&ndash;5)</th><th>Detail (1&ndash;5)</th></tr>";
+    for (const task of ["projectile", "ripple", "shadow"]) {
+      const mo = rows.filter((r) => r.trial_type === "motor_baseline" && r.task_type === task);
+      const im = rows.filter((r) => r.trial_type === "imagery_main" && r.task_type === task);
+      const mRT = mean(mo.map((r) => r.rt)), iRT = mean(im.map((r) => r.rt));
+      html += "<tr><td class='lbl'>" + TASK_INFO[task].title + "</td>" +
+        "<td class='num'>" + fmt(mRT) + "</td>" +
+        "<td class='num'>" + fmt(mean(mo.map((r) => r.motor_target_error)), 3) + "</td>" +
+        "<td class='num'>" + fmt(mean(im.map((r) => r["key_imagined.rt"]))) + "</td>" +
+        "<td class='num'>" + fmt(iRT) + "</td>" +
+        "<td class='num'>" + fmt(iRT - mRT) + "</td>" +
+        "<td class='num'>" + fmt(mean(im.filter((r) => r.vividness !== undefined).map((r) => r.vividness)), 1) + "</td>" +
+        "<td class='num'>" + fmt(mean(im.filter((r) => r.image_detail !== undefined).map((r) => r.image_detail)), 1) + "</td></tr>";
+    }
+    $("tbl-tasks").innerHTML = html;
+    show("s-end");
+  }
+
+  // ======================= Data file =======================
+  // Requested summary columns first, then PsychoPy's order: conditions, loop counters and
+  // component data per routine, response details, then the expInfo columns.
+  // Cells that don't apply to a row are left empty.
+  const CSV_HEADER = [
+    "participant_id", "block_name", "trial_type", "task_type", "stimulus", "rt",
+    "response_x", "response_y", "slider_1", "slider_2", "motor_target_error", "accuracy",
+    "vividness", "image_detail",
+    "phase",
+    "blocks.thisRepN", "blocks.thisTrialN", "blocks.thisN", "blocks.thisIndex",
+    "reading_sentence", "reading_probe", "probe_present", "probe_corr_key",
+    "reading_trials.thisRepN", "reading_trials.thisTrialN", "reading_trials.thisN", "reading_trials.thisIndex",
+    "reading_trial.started", "reading_fix.started", "reading_fix.stopped",
+    "sentence_text.started", "sentence_text.stopped", "key_sentence.started", "key_sentence.keys", "key_sentence.rt",
+    "probe_text.started", "probe_text.stopped", "key_probe.started", "key_probe.keys", "key_probe.rt", "key_probe.corr",
+    "reading_trial.stopped",
+    "target_x1", "target_y1", "target_x2", "target_y2", "target_slider_1", "target_slider_2",
+    "motor_trials.thisRepN", "motor_trials.thisTrialN", "motor_trials.thisN", "motor_trials.thisIndex",
+    "motor_trial.started", "motor_fix.started", "motor_fix.stopped", "motor_canvas.started",
+    "motor_mouse.first_rt", "motor_submit.rt", "motor_canvas.stopped", "motor_trial.stopped",
+    "factor_1", "level_1", "factor_2", "level_2",
+    "imagery_trials.thisRepN", "imagery_trials.thisTrialN", "imagery_trials.thisN", "imagery_trials.thisIndex",
+    "imagery_trial.started", "imagery_fix.started", "imagery_fix.stopped",
+    "imagery_prompt.started", "key_imagined.started", "key_imagined.keys", "key_imagined.rt", "imagery_prompt.stopped",
+    "imagery_canvas.started", "imagery_mouse.first_rt", "imagery_submit.rt", "imagery_canvas.stopped",
+    "vividness.started", "vivid_q1.started", "vivid_q1.keys", "vivid_q1.rt",
+    "vivid_q2.started", "vivid_q2.keys", "vivid_q2.rt", "vividness.stopped", "imagery_trial.stopped",
+    "tutorial_trials.thisN", "tutorial_trial.started", "tutorial_canvas.started", "tutorial_mouse.first_rt",
+    "tutorial_submit.rt", "tutorial_canvas.stopped", "tutorial_trial.stopped",
+    "response_px_x", "response_px_y", "click1_x", "click1_y", "click1_rt", "click2_x", "click2_y", "click2_rt",
+    "shadow_dx", "shadow_dy", "shadow_angle_deg", "shadow_distance",
+    "start_x", "start_y", "start_slider_1", "start_slider_2", "canvas_w", "canvas_h",
+    "participant", "session", "date", "expName", "expStart", "frameRate", "debug", "block_order",
+  ];
+
+  function csvCell(v) {
+    const s = String(v ?? "");
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function safeId() { return participantId.replace(/[^A-Za-z0-9_-]+/g, "_") || "participant"; }
+
+  function downloadCSV() {
+    const lines = [CSV_HEADER.join(",")]
+      .concat(rows.map((r) => CSV_HEADER.map((h) => csvCell({ ...r, ...expInfo }[h])).join(",")));
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    // PsychoPy file name: <participant>_<expName>_<date>.csv
+    a.download = safeId() + "_" + EXP_NAME + "_" + (DEBUG ? "DEBUG_" : "") + expInfo.date + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return a.download;
+  }
+
+  // ======================= Flow =======================
+  // Welcome -> Tutorial -> Reading baseline -> Blocks (motor baseline -> imagery) x3 -> Debrief
+  function beforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+
+  async function runExperiment() {
+    window.addEventListener("beforeunload", beforeUnload);
+    t0 = performance.now();
+    const startDate = new Date();
+    const blockOrder = shuffle(["projectile", "ripple", "shadow"]);
+    rows = [];
+    expInfo = {
+      participant: participantId,
+      session: "001",
+      date: psychopyDate(startDate),
+      expName: EXP_NAME,
+      expStart: startDate.toISOString(),
+      frameRate: "",
+      debug: DEBUG ? 1 : 0,
+      block_order: blockOrder.join("|"),
+    };
+
+    show("s-reading-instr");
+    // Measure the refresh rate while the first instructions are on screen.
+    expInfo.frameRate = Math.round((await measureFrameRate()) * 100) / 100;
+
+    await runReading();
+    await runBlocks(blockOrder);
+
+    finished = true;
+    window.removeEventListener("beforeunload", beforeUnload);
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    showResults();
+    // Save the data automatically; the button stays as a backup.
+    const name = downloadCSV();
+    $("dl-msg").textContent = "Your data was downloaded automatically as " + name +
+      ". If you can't find it, click the button to download it again.";
+  }
+
+  function tryStart() {
+    const v = $("pid").value.trim();
+    if (started) return;
+    if (!v) { $("pid-err").textContent = "Please enter your ID."; $("pid").focus(); return; }
+    started = true;
+    participantId = v;
+    $("btn-start").disabled = true;
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    runExperiment();
+  }
+
+  $("btn-start").addEventListener("click", tryStart);
+  $("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+  $("btn-download").addEventListener("click", () => {
+    if (finished) $("dl-msg").textContent = "Downloaded " + downloadCSV();
+  });
+  if (DEBUG) $("debug-badge").hidden = false;
+  $("pid").value = randomParticipantId();
+  $("pid").focus();
+  $("pid").select();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+task_type,stimulus,factor_1,level_1,factor_2,level_2
+projectile,A heavy iron ball is lobbed gently over a short wall.,force,gentle,arc,high
+projectile,"A baseball is fired in a hard, flat throw from the outfield to home plate.",force,hard,arc,low
+projectile,A tennis ball is tossed softly underhand to a child standing a few feet away.,force,gentle,arc,low
+projectile,A football is punted with full force high into the sky and far down the field.,force,hard,arc,high
+projectile,A water balloon is lobbed slowly and high over a tall fence into the next yard.,force,gentle,arc,high
+projectile,A flat stone is skipped hard and low across a calm pond.,force,hard,arc,low
+projectile,A crumpled ball of paper is flicked lightly into a wastebasket right beside the desk.,force,gentle,arc,low
+projectile,A javelin is launched with great force in a high soaring arc down the field.,force,hard,arc,high
+ripple,A tiny pebble is dropped gently into a calm pond.,size,small,impact,gentle
+ripple,A marble is thrown hard into a still swimming pool.,size,small,impact,hard
+ripple,A large beach ball is set down softly onto a quiet lake.,size,large,impact,gentle
+ripple,A heavy boulder crashes into a deep mountain lake.,size,large,impact,hard
+ripple,A single raindrop falls onto a smooth puddle.,size,small,impact,gentle
+ripple,A bullet strikes the surface of a full bathtub.,size,small,impact,hard
+ripple,A wide wooden plank is lowered slowly onto the surface of a pool.,size,large,impact,gentle
+ripple,"A wide, flat sheet of steel slaps flat onto the surface of a still lake.",size,large,impact,hard
+shadow,"A bright light bulb hangs low, one foot to the left of a tall cylinder.",light_side,left,light_height,low
+shadow,The afternoon sun shines from high up on the right side of a lone tree.,light_side,right,light_height,high
+shadow,A flashlight lying on the floor shines from the right at a tall vase.,light_side,right,light_height,low
+shadow,A streetlamp towers high above and to the left of a parked bicycle.,light_side,left,light_height,high
+shadow,The noon sun blazes almost directly overhead a tall flagpole.,light_side,overhead,light_height,high
+shadow,A candle sits on the table just to the right of a wine bottle.,light_side,right,light_height,low
+shadow,A ceiling lamp hangs high and slightly to the left of a wooden chair.,light_side,left,light_height,high
+shadow,The setting sun sits low on the horizon far to the left of a lighthouse.,light_side,left,light_height,low
