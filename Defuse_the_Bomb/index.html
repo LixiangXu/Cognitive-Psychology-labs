@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Defuse the bomb: a two-person communication game (in the spirit of Keep Talking and Nobody Explodes)</title>
+  <style>
+    :root { color-scheme: light; font-family: sans-serif; }
+    body { margin: 0; background: transparent; color: #334155; }
+    /* standalone page (not inside the slide iframe) */
+    body.standalone { background: #f1f5f9; padding: 0.8rem; }
+    body.standalone .wrap { max-width: 1180px; margin: 0 auto; }
+    .hdr { display: none; margin-bottom: 0.5rem; }
+    body.standalone .hdr { display: block; }
+    .hdr h1 { margin: 0 0 0.15rem; font-size: 1.25rem; color: #1e293b; }
+    .hdr p { margin: 0; font-size: 0.8rem; color: #475569; }
+    .hdr a { color: #1769aa; font-weight: 700; }
+    .seedline { font-size: 0.72rem; color: #64748b; margin-top: 0.35rem; }
+    .seedline code { background: #e2e8f0; padding: 0.05rem 0.35rem; border-radius: 4px; color: #1e293b; }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0 0.2rem 0.35rem; flex-wrap: wrap; }
+    .seg { display: inline-flex; border: 2px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+    .seg button { border: 0; background: #f8fafc; color: #334155; font: inherit; font-size: 0.78rem; font-weight: 700; padding: 0.3rem 0.7rem; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: #1769aa; color: #fff; }
+    .btn { border: 0; border-radius: 6px; padding: 0.32rem 0.75rem; background: #1769aa; color: #fff; font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+    .btn.gray { background: #64748b; } .btn.red { background: #be123c; }
+    .btn:hover { filter: brightness(0.92); }
+    .views { display: grid; grid-template-columns: 1fr 1.15fr; gap: 0.6rem; align-items: start; }
+    .views.bomb-only { grid-template-columns: 1fr; } .views.bomb-only #manual { display: none; }
+    .views.manual-only { grid-template-columns: 1fr; } .views.manual-only #bomb { display: none; }
+    .panel { border-radius: 12px; padding: 0.45rem 0.6rem; box-sizing: border-box; }
+    #bomb { background: #1e293b; color: #e2e8f0; border: 3px solid #475569; position: relative; }
+    #manual { background: #fffbeb; color: #1e293b; border: 3px solid #f59e0b; font-size: 0.67rem; line-height: 1.28; }
+    .ph { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.3rem; opacity: 0.85; }
+    /* bomb header */
+    .bhead { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .timer { font-family: ui-monospace, Menlo, monospace; font-size: 1.9rem; font-weight: 800; color: #f43f5e; background: #0f172a; padding: 0.05rem 0.5rem; border-radius: 6px; border: 2px solid #334155; letter-spacing: 0.06em; }
+    .tag { font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; background: #0f172a; border: 2px solid #334155; border-radius: 6px; padding: 0.2rem 0.5rem; }
+    .tag b { color: #fde68a; }
+    .strikes span { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #334155; margin-left: 4px; border: 2px solid #475569; }
+    .strikes span.on { background: #f43f5e; border-color: #fecdd3; }
+    .mods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+    .mod { background: #0f172a; border: 2px solid #334155; border-radius: 10px; padding: 0.4rem; position: relative; min-height: 190px; }
+    .mod .led { position: absolute; right: 8px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: #475569; border: 2px solid #64748b; }
+    .mod.solved .led { background: #22c55e; border-color: #bbf7d0; box-shadow: 0 0 8px #22c55e; }
+    .mod.solved { opacity: 0.75; }
+    .mod .mt { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 0.3rem; }
+    /* wires */
+    .wires { display: flex; flex-direction: column; gap: 9px; padding: 0.3rem 0.2rem; }
+    .wire { height: 12px; border-radius: 6px; cursor: pointer; position: relative; border: 1px solid rgba(255,255,255,0.25); }
+    .wire.cut { background: transparent !important; border: 0; }
+    .wire.cut::before, .wire.cut::after { content: ""; position: absolute; top: 0; height: 12px; width: 40%; border-radius: 6px; background: var(--c); border: 1px solid rgba(255,255,255,0.25); }
+    .wire.cut::before { left: 0; } .wire.cut::after { right: 0; }
+    /* button */
+    .bigbtn { touch-action: none; -webkit-user-select: none; width: 118px; height: 118px; border-radius: 50%; border: 6px solid #334155; margin: 0.3rem auto 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.95rem; cursor: pointer; user-select: none; box-shadow: inset 0 -6px 0 rgba(0,0,0,0.25); }
+    .bigbtn:active { transform: translateY(2px); }
+    .strip { height: 12px; border-radius: 6px; margin: 0.45rem 0.4rem 0; background: #1e293b; border: 1px solid #334155; }
+    .strip.on { box-shadow: 0 0 10px var(--c); background: var(--c); }
+    .hint { font-size: 0.64rem; color: #94a3b8; text-align: center; margin-top: 0.3rem; }
+    /* keypad */
+    .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0.2rem; }
+    .key { height: 60px; border-radius: 8px; background: #e2e8f0; color: #1e293b; font-size: 1.7rem; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid #94a3b8; user-select: none; }
+    .key.done { background: #bbf7d0; border-color: #16a34a; }
+    .key.bad { background: #fecdd3; border-color: #be123c; }
+    /* overlay */
+    .ov { position: absolute; inset: 0; border-radius: 9px; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 0.4rem; font-weight: 900; font-size: 2rem; letter-spacing: 0.08em; }
+    .ov.show { display: flex; }
+    .ov.boom { background: rgba(190,18,60,0.92); color: #fff; }
+    .ov.ok { background: rgba(22,101,52,0.92); color: #fff; }
+    .ov small { font-size: 0.9rem; font-weight: 700; letter-spacing: 0; }
+    /* manual */
+    .manual h4 { margin: 0.35rem 0 0.15rem; font-size: 0.78rem; color: #92400e; }
+    .manual ol, .manual ul { margin: 0.1rem 0 0.2rem 1.1rem; padding: 0; }
+    .manual li { margin: 0.08rem 0; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; }
+    .symcol { background: #fff; border: 1.5px solid #fcd34d; border-radius: 8px; padding: 0.15rem 0.3rem; text-align: center; font-size: 1rem; line-height: 1.25; }
+    .symcol div { font-size: 0.62rem; font-weight: 800; color: #92400e; }
+    .sol { font-size: 0.72rem; color: #fde68a; background: #0f172a; border: 1px dashed #f59e0b; border-radius: 8px; padding: 0.3rem 0.5rem; margin-top: 0.45rem; display: none; }
+    .sol.show { display: block; }
+    .note { font-size: 0.66rem; color: #78350f; margin-top: 0.35rem; }
+    @media (max-width: 760px) {
+      .views, .views.bomb-only, .views.manual-only { grid-template-columns: 1fr; }
+      .mods { grid-template-columns: 1fr; }
+      .mod { min-height: 0; }
+      .timer { font-size: 1.5rem; }
+      .bhead { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+  <div class="hdr">
+    <h1>Defuse the Bomb</h1>
+    <p>A two-person communication game. The <b>defuser</b> sees the bomb; the <b>expert</b> sees only the manual. Neither can solve it alone: talk.
+      Open <a href="#bomb">#bomb</a> on the defuser&#8217;s screen and <a href="#manual">#manual</a> on the expert&#8217;s. Three strikes or 0:00 and it explodes.</p>
+    <div class="seedline">Bomb <code id="seedtag"></code> &#183; share this exact bomb: <a id="sharelink" href="#">link</a> &#183; PSY 221, Wake Forest University</div>
+  </div>
+  <div class="top">
+    <div class="seg" role="group" aria-label="Which panel to show">
+      <button type="button" data-view="both" aria-pressed="true">Both</button>
+      <button type="button" data-view="bomb" aria-pressed="false">Bomb only (defuser)</button>
+      <button type="button" data-view="manual" aria-pressed="false">Manual only (expert)</button>
+    </div>
+    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+      <button type="button" class="btn" id="start">&#9654; Start timer</button>
+      <button type="button" class="btn gray" id="newbomb">&#8635; New bomb</button>
+      <button type="button" class="btn red" id="solution">Show solution (debrief)</button>
+    </div>
+  </div>
+
+  <div class="views" id="views">
+    <div class="panel" id="bomb" aria-label="The bomb: the defuser's view">
+      <div class="bhead">
+        <div class="timer" id="timer">3:00</div>
+        <div class="tag">SERIAL <b id="serial">A1B2C3</b></div>
+        <div class="tag">BATTERIES <b id="batt">2</b></div>
+        <div class="strikes" aria-label="strikes"><span id="s1"></span><span id="s2"></span><span id="s3"></span></div>
+      </div>
+      <div class="mods">
+        <div class="mod" id="m-wires"><div class="led"></div><div class="mt">WIRES</div><div class="wires" id="wires"></div><div class="hint">click a wire to cut it</div></div>
+        <div class="mod" id="m-button"><div class="led"></div><div class="mt">BUTTON</div><div class="bigbtn" id="bigbtn">HOLD</div><div class="strip" id="strip"></div><div class="hint" id="bhint">press, or press and hold</div></div>
+        <div class="mod" id="m-keys"><div class="led"></div><div class="mt">KEYPAD</div><div class="keys" id="keys"></div><div class="hint">press the symbols in the right order</div></div>
+      </div>
+      <div class="sol" id="sol"></div>
+      <div class="ov boom" id="boom">BOOM<small id="boomwhy"></small></div>
+      <div class="ov ok" id="defused">DEFUSED<small id="oktime"></small></div>
+    </div>
+
+    <div class="panel manual" id="manual" aria-label="The manual: the expert's view">
+      <div class="ph">Defusal manual &#183; the expert reads, the defuser acts</div>
+      <h4>Wires</h4>
+      <ul>
+        <li><b>3 wires:</b> any <b>red</b>? cut the <b>first red</b>. Else, last wire <b>white</b>? cut the <b>first</b> wire. Else cut the <b>last</b> wire.</li>
+        <li><b>4 wires:</b> more than one <b>blue</b>? cut the <b>last blue</b>. Else, serial ends in an <b>odd digit</b> and there is a <b>red</b>? cut the <b>last red</b>. Else, no <b>yellow</b>? cut the <b>second</b> wire. Else cut the <b>first</b>.</li>
+        <li><b>5 wires:</b> last wire <b>black</b> and serial ends <b>odd</b>? cut the <b>fourth</b>. Else, exactly one <b>yellow</b> and more than one <b>blue</b>? cut the <b>first</b>. Else, no <b>black</b>? cut the <b>third</b>. Else cut the <b>first black</b>.</li>
+      </ul>
+      <h4>Button</h4>
+      <ol>
+        <li>Button is <b>blue</b> and says <b>ABORT</b>: press and release right away.</li>
+        <li>More than <b>2 batteries</b> and it says <b>DETONATE</b>: press and release right away.</li>
+        <li>Button is <b>white</b> and the serial contains a <b>vowel</b>: press and release right away.</li>
+        <li>Otherwise, <b>press and hold</b>. A strip lights up: <b>blue</b> strip &#8594; release when the timer&#8217;s seconds contain a <b>4</b>; <b>yellow</b> &#8594; contain a <b>5</b>; any other color &#8594; contain a <b>1</b>.</li>
+      </ol>
+      <h4>Keypad</h4>
+      <div>All four symbols on the bomb appear in <b>one</b> column. Press them in that column&#8217;s <b>top-to-bottom</b> order.</div>
+      <div class="cols" style="margin-top: 0.25rem;">
+        <div class="symcol"><div>COLUMN 1</div>&#937;<br>&#1046;<br>&#9734;<br>&#182;<br>&#1126;<br>&#664;</div>
+        <div class="symcol"><div>COLUMN 2</div>&#1126;<br>&#937;<br>&#191;<br>&#1046;<br>&#8853;<br>&#9734;</div>
+        <div class="symcol"><div>COLUMN 3</div>&#664;<br>&#191;<br>&#1126;<br>&#8853;<br>&#182;<br>&#936;</div>
+      </div>
+      <div class="note">Three strikes and it explodes. Only the defuser sees the bomb; only the expert sees the manual. You have to talk.</div>
+    </div>
+  </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = (id) => document.getElementById(id);
+      const COLORS = { red: '#ef4444', blue: '#3b82f6', yellow: '#facc15', white: '#f1f5f9', black: '#0a0a0a' };
+      const COLS = [['Ω', 'Ж', '☆', '¶', 'Ѧ', 'ʘ'], ['Ѧ', 'Ω', '¿', 'Ж', '⊕', '☆'], ['ʘ', '¿', 'Ѧ', '⊕', '¶', 'Ψ']];
+      const LABELS = ['PRESS', 'HOLD', 'DETONATE', 'ABORT'];
+      const BCOLORS = ['red', 'blue', 'yellow', 'white'];
+      // seeded random numbers (mulberry32) so the same ?seed= gives the same bomb on every device
+      let rng = Math.random, seed = 0;
+      function setSeed(n) { seed = n >>> 0; let a = seed; rng = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+      const pick = (a) => a[Math.floor(rng() * a.length)];
+      const shuffle = (a) => a.map((v) => [rng(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+      let S = null, tick = null, holdT0 = 0, holdColor = null;
+
+      function newBomb(useSeed) {
+        clearInterval(tick); tick = null;
+        setSeed(useSeed === undefined ? Math.floor(Math.random() * 1e9) : useSeed);
+        $('seedtag').textContent = '#' + seed;
+        const u = new URL(location.href); u.searchParams.set('seed', seed); u.hash = 'bomb'; $('sharelink').href = u.toString();
+        const serial = Array.from({ length: 6 }, (_, i) => i < 2 ? pick('ABCDEFGHJKLMNPQRSTUVWXYZ') : pick('0123456789'))
+          .join('');
+        const n = 3 + Math.floor(rng() * 3);
+        const wires = Array.from({ length: n }, () => pick(Object.keys(COLORS)));
+        const col = Math.floor(rng() * 3);
+        const idx = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 4).sort((a, b) => a - b);
+        const keySeq = idx.map((i) => COLS[col][i]);
+        const shown = shuffle(keySeq);
+        S = { serial, batt: Math.floor(rng() * 4), wires, bcolor: pick(BCOLORS), blabel: pick(LABELS),
+              col, keySeq, shown, keyPos: 0, strikes: 0, time: 180, running: false, solved: { wires: false, button: false, keys: false }, over: false };
+        render();
+      }
+      const lastDigit = () => Number(S.serial[S.serial.length - 1]);
+      const hasVowel = () => /[AEIOU]/.test(S.serial);
+
+      function wireAnswer() {
+        const w = S.wires, n = w.length, odd = lastDigit() % 2 === 1;
+        const count = (c) => w.filter((x) => x === c).length;
+        const last = (c) => w.lastIndexOf(c), first = (c) => w.indexOf(c);
+        if (n === 3) { if (count('red')) return first('red'); if (w[2] === 'white') return 0; return 2; }
+        if (n === 4) { if (count('blue') > 1) return last('blue'); if (odd && count('red')) return last('red'); if (!count('yellow')) return 1; return 0; }
+        if (w[4] === 'black' && odd) return 3;
+        if (count('yellow') === 1 && count('blue') > 1) return 0;
+        if (!count('black')) return 2;
+        return first('black');
+      }
+      function buttonMode() {
+        if (S.bcolor === 'blue' && S.blabel === 'ABORT') return 'press';
+        if (S.batt > 2 && S.blabel === 'DETONATE') return 'press';
+        if (S.bcolor === 'white' && hasVowel()) return 'press';
+        return 'hold';
+      }
+      const stripDigit = (c) => (c === 'blue' ? '4' : c === 'yellow' ? '5' : '1');
+
+      function render() {
+        $('serial').textContent = S.serial; $('batt').textContent = S.batt;
+        [1, 2, 3].forEach((i) => $('s' + i).classList.toggle('on', S.strikes >= i));
+        $('timer').textContent = fmt(S.time);
+        // wires
+        const W = $('wires'); W.replaceChildren();
+        S.wires.forEach((c, i) => {
+          const d = document.createElement('div'); d.className = 'wire'; d.style.background = COLORS[c]; d.style.setProperty('--c', COLORS[c]);
+          d.setAttribute('role', 'button'); d.setAttribute('aria-label', c + ' wire ' + (i + 1));
+          d.addEventListener('click', () => cut(i, d)); W.appendChild(d);
+        });
+        // button
+        const b = $('bigbtn'); b.textContent = S.blabel; b.style.background = COLORS[S.bcolor];
+        b.style.color = (S.bcolor === 'white' || S.bcolor === 'yellow') ? '#1e293b' : '#fff';
+        $('strip').className = 'strip'; $('bhint').textContent = 'press, or press and hold';
+        // keys
+        const K = $('keys'); K.replaceChildren();
+        S.shown.forEach((sym) => { const k = document.createElement('div'); k.className = 'key'; k.textContent = sym; k.setAttribute('role', 'button');
+          k.addEventListener('click', () => pressKey(sym, k)); K.appendChild(k); });
+        ['wires', 'button', 'keys'].forEach((m) => $('m-' + m).classList.toggle('solved', S.solved[m]));
+        $('boom').classList.remove('show'); $('defused').classList.remove('show'); $('sol').classList.remove('show');
+        $('start').textContent = '▶ Start timer';
+      }
+      const fmt = (t) => Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+
+      function strike(why) {
+        if (S.over) return;
+        S.strikes++; [1, 2, 3].forEach((i) => $('s' + i).classList.toggle('on', S.strikes >= i));
+        if (S.strikes >= 3) explode(why);
+      }
+      function explode(why) { S.over = true; clearInterval(tick); tick = null; $('boomwhy').textContent = why; $('boom').classList.add('show'); }
+      function checkWin() {
+        if (S.solved.wires && S.solved.button && S.solved.keys) { S.over = true; clearInterval(tick); tick = null; $('oktime').textContent = 'with ' + fmt(S.time) + ' left'; $('defused').classList.add('show'); }
+      }
+      function cut(i, el) {
+        if (S.over || S.solved.wires || el.classList.contains('cut')) return;
+        el.classList.add('cut');
+        if (i === wireAnswer()) { S.solved.wires = true; $('m-wires').classList.add('solved'); checkWin(); }
+        else strike('wrong wire');
+      }
+      function pressKey(sym, el) {
+        if (S.over || S.solved.keys || el.classList.contains('done')) return;
+        if (sym === S.keySeq[S.keyPos]) { el.classList.add('done'); S.keyPos++; if (S.keyPos === 4) { S.solved.keys = true; $('m-keys').classList.add('solved'); checkWin(); } }
+        else { el.classList.add('bad'); setTimeout(() => el.classList.remove('bad'), 500); strike('wrong keypad order'); }
+      }
+      // button: press vs hold
+      const bb = $('bigbtn');
+      function down(e) { e.preventDefault(); if (S.over || S.solved.button) return; holdT0 = Date.now(); holdColor = ['blue', 'yellow', 'white', 'red'][Math.floor(Math.random() * 4)];
+        setTimeout(() => { if (holdT0 && Date.now() - holdT0 >= 450) { const s = $('strip'); s.style.setProperty('--c', COLORS[holdColor]); s.classList.add('on'); $('bhint').textContent = 'holding… release at the right second'; } }, 450); }
+      function up(e) { e.preventDefault(); if (!holdT0 || S.over || S.solved.button) return;
+        const held = Date.now() - holdT0 >= 450; holdT0 = 0; $('strip').className = 'strip'; $('bhint').textContent = 'press, or press and hold';
+        const mode = buttonMode();
+        if (mode === 'press') { if (!held) solveButton(); else strike('should have pressed, not held'); return; }
+        if (!held) { strike('should have held the button'); return; }
+        const secs = String(S.time % 60).padStart(2, '0');
+        if (secs.includes(stripDigit(holdColor))) solveButton(); else strike('released at the wrong second (' + secs + ')'); }
+      function solveButton() { S.solved.button = true; $('m-button').classList.add('solved'); checkWin(); }
+      bb.addEventListener('mousedown', down); bb.addEventListener('touchstart', down, { passive: false });
+      bb.addEventListener('mouseup', up); bb.addEventListener('touchend', up, { passive: false });
+      bb.addEventListener('mouseleave', (e) => { if (holdT0) up(e); });
+
+      $('start').addEventListener('click', () => {
+        if (S.over) return;
+        if (tick) { clearInterval(tick); tick = null; $('start').textContent = '▶ Resume'; return; }
+        $('start').textContent = '❚❚ Pause';
+        tick = setInterval(() => { S.time--; $('timer').textContent = fmt(S.time); if (S.time <= 0) explode('time ran out'); }, 1000);
+      });
+      $('newbomb').addEventListener('click', () => newBomb());
+      $('solution').addEventListener('click', () => {
+        const w = wireAnswer(), mode = buttonMode();
+        $('sol').innerHTML = '<b>Solution:</b> cut wire ' + (w + 1) + ' (' + S.wires[w] + ') &#183; button: ' + (mode === 'press' ? 'press and release' : 'hold; release when the seconds contain the strip’s digit (blue 4, yellow 5, other 1)') + ' &#183; keypad: ' + S.keySeq.join(' → ') + ' (column ' + (S.col + 1) + ')';
+        $('sol').classList.toggle('show');
+      });
+      function setView(v) {
+        if (!['both', 'bomb', 'manual'].includes(v)) v = 'both';
+        document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === v)));
+        $('views').className = 'views ' + (v === 'both' ? '' : v + '-only');
+      }
+      document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => { location.hash = b.dataset.view === 'both' ? '' : b.dataset.view; setView(b.dataset.view); }));
+      window.addEventListener('hashchange', () => setView(location.hash.slice(1)));
+      if (window.self === window.top) document.body.classList.add('standalone');
+      const qs = new URLSearchParams(location.search).get('seed');
+      newBomb(qs !== null && /^\d+$/.test(qs) ? Number(qs) : undefined);
+      setView(location.hash.slice(1));
+    })();
+  </script>
+</body>
+</html>
