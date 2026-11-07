@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Push the Box: means-end analysis in three levels</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { background: transparent; color: #334155; -webkit-tap-highlight-color: transparent; }
+    body.standalone { background: #f1f5f9; }
+    .app { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px; height: 100%; }
+    body.standalone .app { padding: 14px 10px 18px; max-width: 760px; margin: 0 auto; }
+    .hdr { display: none; text-align: center; }
+    body.standalone .hdr { display: block; }
+    .hdr h1 { margin: 0; font-size: 1.35rem; color: #1e293b; }
+    .hdr p { margin: 4px 0 0; font-size: 0.85rem; color: #475569; }
+
+    .top { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; width: 100%; }
+    .seg { display: inline-flex; border: 2px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+    .seg button { border: 0; background: #f8fafc; color: #334155; font: inherit; font-size: 0.82rem; font-weight: 700; padding: 6px 12px; cursor: pointer; }
+    .seg button + button { border-left: 2px solid #cbd5e1; }
+    .seg button[aria-pressed="true"] { background: #1769aa; color: #fff; }
+    .seg button.done::after { content: " \2713"; }
+    .btn { border: 0; border-radius: 6px; padding: 6px 12px; background: #64748b; color: #fff; font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+    .btn:hover { filter: brightness(0.92); }
+    .btn.blue { background: #1769aa; }
+
+    .task { width: 100%; max-width: 640px; background: #ffffff; border: 2px solid #cbd5e1; border-radius: 10px; padding: 7px 12px; font-size: 0.85rem; line-height: 1.35; }
+    .task b { color: #0369a1; }
+    .task .sub { color: #b45309; }
+
+    .stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; font-size: 0.8rem; }
+    .pill { background: #ffffff; border: 2px solid #e2e8f0; border-radius: 999px; padding: 3px 10px; }
+    .pill b { color: #0f172a; }
+    .pill.diff b { color: #be123c; }
+
+    .play { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+    .board { position: relative; background: #475569; border-radius: 10px; padding: 6px; outline: none; box-shadow: 0 6px 14px rgba(15,23,42,0.18); touch-action: none; }
+    .board:focus-visible { box-shadow: 0 0 0 4px #7dd3fc, 0 6px 14px rgba(15,23,42,0.18); }
+    .grid { position: relative; }
+    .cell { position: absolute; border-radius: 4px; }
+    .floor { background: #f8fafc; }
+    .wall { background: #475569; }
+    .goal { background: #dcfce7; box-shadow: inset 0 0 0 3px #16a34a; }
+    .goal::after { content: ""; position: absolute; left: 40%; top: 18%; width: 34%; height: 30%; background: #16a34a; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+    .goal::before { content: ""; position: absolute; left: 36%; top: 16%; width: 6%; height: 66%; background: #14532d; border-radius: 2px; }
+    .cross { background: #f8fafc; box-shadow: inset 0 0 0 3px #a855f7; }
+    .cross::after { content: "+"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.6em; font-weight: 900; color: #c084fc; }
+    .park { background: #fffbeb; box-shadow: inset 0 0 0 3px #f59e0b; }
+    .park::after { content: "park"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.6em; font-weight: 800; color: #b45309; letter-spacing: 0.04em; }
+    .sprite { position: absolute; transition: transform 0.11s ease-out; will-change: transform; }
+    .player { border-radius: 50%; background: radial-gradient(circle at 35% 35%, #7dd3fc, #0369a1 70%); box-shadow: 0 2px 4px rgba(15,23,42,0.35); }
+    .box { border-radius: 6px; background: linear-gradient(135deg, #fcd34d, #f59e0b); box-shadow: inset 0 0 0 3px #b45309, 0 2px 4px rgba(15,23,42,0.3); display: flex; align-items: center; justify-content: center; color: #92400e; font-weight: 900; }
+    .box.ongoal { background: linear-gradient(135deg, #86efac, #16a34a); box-shadow: inset 0 0 0 3px #14532d, 0 2px 4px rgba(15,23,42,0.3); color: #14532d; }
+    .crate { border-radius: 6px; background: repeating-linear-gradient(45deg, #94a3b8, #94a3b8 6px, #64748b 6px, #64748b 12px); box-shadow: inset 0 0 0 3px #334155, 0 2px 4px rgba(15,23,42,0.3); }
+    .crate.parked { box-shadow: inset 0 0 0 3px #b45309, 0 0 0 3px #fcd34d; }
+
+    .pad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 6px; user-select: none; -webkit-user-select: none; }
+    .pad button { border: 0; border-radius: 12px; background: #1769aa; color: #fff; font-size: 1.45rem; font-weight: 800; cursor: pointer; touch-action: manipulation; box-shadow: 0 3px 0 #0e4f82; }
+    .pad button:active { transform: translateY(2px); box-shadow: 0 1px 0 #0e4f82; }
+    .pad .u { grid-column: 2; grid-row: 1; } .pad .l { grid-column: 1; grid-row: 2; }
+    .pad .r { grid-column: 3; grid-row: 2; } .pad .d { grid-column: 2; grid-row: 3; }
+    .pad .mid { grid-column: 2; grid-row: 2; display: flex; align-items: center; justify-content: center; font-size: 0.62rem; color: #64748b; text-align: center; line-height: 1.1; }
+
+    .msg { min-height: 1.5em; font-size: 0.88rem; font-weight: 700; text-align: center; }
+    .msg.win { color: #166534; } .msg.stuck { color: #be123c; } .msg.info { color: #0369a1; }
+    .hint { font-size: 0.72rem; color: #64748b; text-align: center; }
+    body:not(.standalone) .hint.kbd { display: block; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <h1>Push the Box</h1>
+    <p>Get the gold box onto the green flag. You can push boxes, but never pull them, and never push two at once.</p>
+  </div>
+
+  <div class="top">
+    <span class="seg" role="group" aria-label="Choose a level">
+      <button type="button" data-level="0" aria-pressed="true">Level 1</button>
+      <button type="button" data-level="1" aria-pressed="false">Level 2</button>
+      <button type="button" data-level="2" aria-pressed="false">Level 3</button>
+    </span>
+    <button type="button" class="btn" id="undo" title="Undo (Z)">&#8630; Undo</button>
+    <button type="button" class="btn" id="reset" title="Restart level (R)">&#8634; Restart</button>
+  </div>
+
+  <div class="task" id="task" aria-live="polite"></div>
+
+  <div class="stats">
+    <span class="pill">Moves: <b id="moves">0</b></span>
+    <span class="pill">Fewest possible: <b id="best">0</b></span>
+    <span class="pill diff" title="Shortest walking distance from the gold box to the flag, ignoring the other boxes">Difference: <b id="diff">0</b> squares to go</span>
+  </div>
+
+  <div class="play">
+    <div class="board" id="board" tabindex="0" aria-label="Game board. Use the arrow keys to move.">
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="pad" aria-label="On-screen arrow keys">
+      <button type="button" class="u" data-dir="U" aria-label="Up">&#9650;</button>
+      <button type="button" class="l" data-dir="L" aria-label="Left">&#9664;</button>
+      <div class="mid">or use<br>arrow<br>keys</div>
+      <button type="button" class="r" data-dir="R" aria-label="Right">&#9654;</button>
+      <button type="button" class="d" data-dir="D" aria-label="Down">&#9660;</button>
+    </div>
+  </div>
+
+  <div class="msg" id="msg" aria-live="polite"></div>
+  <div class="hint kbd">Keyboard: arrow keys or W A S D &#183; Z = undo &#183; R = restart. Click the board first if keys do nothing.</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // Legend: # wall, . floor, P player, B gold box (target), O gray crate (obstacle), G goal, c parking spot, x center of the cross
+  const LEVELS = [
+    { map: [
+        '#########',
+        '#.......#',
+        '#.P.B..G#',
+        '#.......#',
+        '#########'],
+      best: 4,
+      task: '<b>Goal:</b> gold box on the flag. <b>Difference:</b> how far it still has to go. <b>Means:</b> push it toward the flag. Every push shrinks the difference.' },
+    { map: [
+        '########',
+        '#....###',
+        '#.##.###',
+        '#.##.###',
+        '#PB.x.##',
+        '####.###',
+        '####.###',
+        '####G###',
+        '########'],
+      best: 15,
+      center: [4, 4],
+      task: 'The flag is at the bottom of a cross (+), and you can only push down from the top. <span class="sub"><b>Subgoal 1:</b> push the box into the center of the cross.</span> <span class="sub"><b>Subgoal 2:</b> walk around to the top arm.</span> Then push the box down to the flag. Push it past the center and it is stuck.' },
+    { map: [
+        '########',
+        '#....###',
+        '#.##.###',
+        '#.##.###',
+        '#.BPOc##',
+        '####.###',
+        '####.###',
+        '####G###',
+        '########'],
+      best: 25,
+      needPark: true,
+      center: [4, 4],
+      task: 'Same cross, but a gray crate fills the center. <span class="sub"><b>Subgoal first:</b> push the crate into the parking spot.</span> Then repeat level 2: box to the center, walk around to the top, push it down. Push the crate down the shaft, or the box to the left, and the level is lost.' }
+  ];
+  const DIRS = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0] };
+
+  const standalone = window.self === window.top;
+  if (standalone) document.body.classList.add('standalone');
+
+  const els = {
+    grid: document.getElementById('grid'), board: document.getElementById('board'),
+    moves: document.getElementById('moves'), best: document.getElementById('best'),
+    diff: document.getElementById('diff'), msg: document.getElementById('msg'), task: document.getElementById('task'),
+    levelBtns: [...document.querySelectorAll('.seg button')]
+  };
+
+  let level = 0, L = null, state = null, history = [], moves = 0, won = false, cell = 48;
+  const solved = new Set();
+  let player, box, crates = [];
+
+  const key = (x, y) => x + ',' + y;
+
+  function parse(map) {
+    const walls = new Set(); let P, B, G, park = null; const O = [];
+    map.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (ch === '#') walls.add(key(x, y));
+      else if (ch === 'P') P = [x, y];
+      else if (ch === 'B') B = [x, y];
+      else if (ch === 'G') G = [x, y];
+      else if (ch === 'O') O.push([x, y]);
+      else if (ch === 'c') park = [x, y];
+    }));
+    return { walls, P, B, G, O, park, w: map[0].length, h: map.length };
+  }
+
+  function boxDistance(b) {   // walking distance for the box to the goal, ignoring crates and the player
+    const goal = key(...L.G), seen = new Set([key(...b)]); let q = [b], d = 0;
+    while (q.length) {
+      const nq = [];
+      for (const [x, y] of q) {
+        if (key(x, y) === goal) return d;
+        for (const [dx, dy] of Object.values(DIRS)) {
+          const k = key(x + dx, y + dy);
+          if (!L.walls.has(k) && !seen.has(k)) { seen.add(k); nq.push([x + dx, y + dy]); }
+        }
+      }
+      q = nq; d++;
+    }
+    return Infinity;
+  }
+
+  function isWin(s) {
+    if (key(...s.b) !== key(...L.G)) return false;
+    if (L.needPark && !s.o.some(c => key(...c) === key(...L.park))) return false;
+    return true;
+  }
+
+  function step(s, dir) {   // returns new state or null if the move is blocked
+    const [dx, dy] = DIRS[dir];
+    const n = [s.p[0] + dx, s.p[1] + dy], nk = key(...n);
+    if (L.walls.has(nk)) return null;
+    const b = s.b.slice(), o = s.o.map(c => c.slice());
+    const occupied = (k) => L.walls.has(k) || k === key(...b) || o.some(c => key(...c) === k);
+    if (nk === key(...b)) {
+      const t = [b[0] + dx, b[1] + dy];
+      if (occupied(key(...t))) return null;
+      b[0] = t[0]; b[1] = t[1];
+    } else {
+      const i = o.findIndex(c => key(...c) === nk);
+      if (i >= 0) {
+        const t = [o[i][0] + dx, o[i][1] + dy];
+        if (occupied(key(...t))) return null;
+        o[i] = t;
+      }
+    }
+    return { p: n, b, o };
+  }
+
+  const stateKey = (s) => key(...s.p) + '|' + key(...s.b) + '|' + s.o.map(c => key(...c)).sort().join(';');
+
+  function solvable(s) {      // breadth-first search; boards are tiny
+    const seen = new Set([stateKey(s)]); let q = [s], n = 0;
+    while (q.length) {
+      const nq = [];
+      for (const st of q) {
+        if (isWin(st)) return true;
+        for (const d of 'UDLR') {
+          const ns = step(st, d);
+          if (!ns) continue;
+          const k = stateKey(ns);
+          if (!seen.has(k)) { seen.add(k); nq.push(ns); if (++n > 300000) return true; }
+        }
+      }
+      q = nq;
+    }
+    return false;
+  }
+
+  function sizeBoard() {
+    const availW = standalone ? Math.min(window.innerWidth - 40, 620) : Math.max(window.innerWidth - 220, 200);
+    const availH = standalone ? Math.max(window.innerHeight - 330, 200) : Math.max(window.innerHeight - 170, 160);
+    cell = Math.floor(Math.max(26, Math.min(availW / L.w, availH / L.h, 58)));
+  }
+
+  function build() {
+    sizeBoard();
+    const g = els.grid; g.innerHTML = '';
+    g.style.width = (L.w * cell) + 'px'; g.style.height = (L.h * cell) + 'px';
+    for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) {
+      const k = key(x, y), d = document.createElement('div');
+      let cls = L.walls.has(k) ? 'wall' : 'floor';
+      if (k === key(...L.G)) cls = 'goal';
+      else if (L.park && k === key(...L.park)) cls = 'park';
+      else if (L.center && k === key(...L.center)) cls = 'cross';
+      d.className = 'cell ' + cls;
+      Object.assign(d.style, { left: (x * cell + 1) + 'px', top: (y * cell + 1) + 'px', width: (cell - 2) + 'px', height: (cell - 2) + 'px', fontSize: (cell * 0.36) + 'px' });
+      g.appendChild(d);
+    }
+    const mk = (cls, inset) => { const d = document.createElement('div'); d.className = 'sprite ' + cls; Object.assign(d.style, { left: inset + 'px', top: inset + 'px', width: (cell - 2 * inset) + 'px', height: (cell - 2 * inset) + 'px', fontSize: (cell * 0.42) + 'px' }); g.appendChild(d); return d; };
+    crates = state.o.map(() => mk('crate', cell * 0.1));
+    box = mk('box', cell * 0.1); box.textContent = '★';
+    player = mk('player', cell * 0.18);
+    draw();
+  }
+
+  function place(el, x, y) { el.style.transform = 'translate(' + (x * cell) + 'px,' + (y * cell) + 'px)'; }
+
+  function draw() {
+    place(player, ...state.p); place(box, ...state.b);
+    box.classList.toggle('ongoal', key(...state.b) === key(...L.G));
+    state.o.forEach((c, i) => { place(crates[i], ...c); crates[i].classList.toggle('parked', !!L.park && key(...c) === key(...L.park)); });
+    els.moves.textContent = moves;
+    const d = boxDistance(state.b);
+    els.diff.textContent = d === Infinity ? '—' : d;
+  }
+
+  function setMsg(text, cls) { els.msg.textContent = text; els.msg.className = 'msg ' + (cls || ''); }
+
+  let checkTimer = null;
+  function move(dir) {
+    if (won) return;
+    const ns = step(state, dir);
+    if (!ns) return;
+    history.push(state); state = ns; moves++;
+    draw();
+    if (isWin(state)) {
+      won = true; solved.add(level); markDone();
+      const opt = LEVELS[level].best;
+      setMsg((moves === opt ? 'Solved in ' + moves + ' moves: the shortest path!' : 'Solved in ' + moves + ' moves (fewest possible: ' + opt + ').') + (level < LEVELS.length - 1 ? ' Try the next level.' : ' All three levels done!'), 'win');
+      return;
+    }
+    if (L.needPark && key(...state.o[0]) === key(...L.park) && !history.some(h => key(...h.o[0]) === key(...L.park))) setMsg('Subgoal reached: the crate is parked. Now push the gold box into the center.', 'info');
+    else if (L.center && key(...state.b) === key(...L.center) && !history.some(h => key(...h.b) === key(...L.center))) setMsg('Subgoal reached: the box is in the center. Now walk around to the top and push it down.', 'info');
+    else setMsg('');
+    clearTimeout(checkTimer);
+    const snapshot = state;
+    checkTimer = setTimeout(() => { if (snapshot === state && !won && !solvable(state)) setMsg('Stuck: there is no way to win from here. Press Undo.', 'stuck'); }, 30);
+  }
+
+  function undo() {
+    if (!history.length) return;
+    state = history.pop(); moves = Math.max(0, moves - 1); won = false; setMsg(''); draw();
+  }
+
+  function load(i) {
+    level = i; L = parse(LEVELS[i].map); L.needPark = !!LEVELS[i].needPark; L.center = LEVELS[i].center || null;
+    state = { p: L.P, b: L.B, o: L.O.map(c => c.slice()) };
+    history = []; moves = 0; won = false;
+    els.best.textContent = LEVELS[i].best; els.task.innerHTML = LEVELS[i].task;
+    els.levelBtns.forEach((b, k) => b.setAttribute('aria-pressed', String(k === i)));
+    setMsg(''); build();
+  }
+
+  function markDone() { els.levelBtns.forEach((b, k) => b.classList.toggle('done', solved.has(k))); }
+
+  // keyboard
+  const keymap = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R', w: 'U', s: 'D', a: 'L', d: 'R', W: 'U', S: 'D', A: 'L', D: 'R' };
+  document.addEventListener('keydown', (e) => {
+    if (keymap[e.key]) { e.preventDefault(); e.stopPropagation(); move(keymap[e.key]); }
+    else if (e.key === 'z' || e.key === 'Z' || e.key === 'Backspace') { e.preventDefault(); undo(); }
+    else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); load(level); }
+  });
+
+  // on-screen arrows: fire on pointerdown, repeat while held
+  document.querySelectorAll('.pad button').forEach((b) => {
+    let t1 = null, t2 = null;
+    const stop = () => { clearTimeout(t1); clearInterval(t2); };
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); move(b.dataset.dir);
+      stop(); t1 = setTimeout(() => { t2 = setInterval(() => move(b.dataset.dir), 140); }, 380);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, stop));
+  });
+
+  // swipe on the board (phones)
+  let sx = null, sy = null;
+  els.board.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; els.board.focus(); });
+  els.board.addEventListener('pointerup', (e) => {
+    if (sx === null) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy; sx = sy = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U'));
+  });
+
+  els.levelBtns.forEach((b) => b.addEventListener('click', () => { load(Number(b.dataset.level)); els.board.focus(); }));
+  document.getElementById('undo').addEventListener('click', () => { undo(); els.board.focus(); });
+  document.getElementById('reset').addEventListener('click', () => { load(level); els.board.focus(); });
+  window.addEventListener('resize', () => { const s = state; build(); state = s; draw(); });
+
+  const q = new URLSearchParams(location.search).get('level');
+  load(q && /^[123]$/.test(q) ? Number(q) - 1 : 0);
+  if (standalone) els.board.focus();
+})();
+</script>
+</body>
+</html>
