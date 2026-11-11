@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 8: Remote Associates Test</title>
+<style>
+  :root {
+    --bg: #7F7F7F;
+    --fg: #FFFFFF;
+    --fg-dim: #F0F0F0;
+    --input-bg: #6E6E6E;
+    --ink: #4A4A4A;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--fg);
+    font-family: Arial, Helvetica, "Helvetica Neue", system-ui, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  .screen {
+    display: none; width: 100%; max-width: 900px; padding: 24px 16px;
+    text-align: center;
+  }
+  .screen.active { display: block; }
+  h1 { font-size: 32px; font-weight: normal; margin: 0 0 24px; }
+  p, li { font-size: 20px; line-height: 1.5; color: var(--fg-dim); }
+  .instr { text-align: left; max-width: 720px; margin: 0 auto; }
+  .instr .example {
+    text-align: center; font-size: 26px; letter-spacing: 0.04em; color: var(--fg);
+    margin: 18px 0; padding: 14px; border: 1.5px solid rgba(255,255,255,0.5); border-radius: 4px;
+  }
+  .instr .example small { display: block; font-size: 17px; letter-spacing: 0; color: var(--fg-dim); margin-top: 8px; }
+  .instr dl { margin: 8px 0 0; }
+  .instr dt { font-size: 20px; font-weight: bold; color: var(--fg); margin-top: 14px; }
+  .instr dd { font-size: 20px; line-height: 1.5; color: var(--fg-dim); margin: 2px 0 0 24px; }
+  kbd {
+    display: inline-block; min-width: 28px; padding: 1px 8px; margin: 0 2px;
+    font-family: inherit; font-size: 18px; text-align: center;
+    border: 1.5px solid var(--fg-dim); border-radius: 4px;
+  }
+  .press { font-size: 20px; margin-top: 36px; color: var(--fg); }
+
+  input[type=text] {
+    font: inherit; font-size: 28px; text-align: center;
+    width: 320px; max-width: 90%; padding: 10px 12px;
+    background: var(--input-bg); color: var(--fg);
+    border: 2px solid var(--fg-dim); border-radius: 4px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--fg); }
+  button {
+    font: inherit; font-size: 20px; padding: 12px 32px; margin-top: 28px;
+    background: var(--fg); color: var(--ink); font-weight: bold;
+    border: 2px solid var(--fg); border-radius: 4px; cursor: pointer;
+  }
+  button:hover { background: var(--fg-dim); }
+  label { display: block; font-size: 20px; margin-bottom: 12px; color: var(--fg-dim); }
+  #debug-badge {
+    position: fixed; top: 8px; left: 8px; padding: 2px 8px; font-size: 13px;
+    border: 1px solid var(--fg); border-radius: 3px; opacity: 0.8;
+  }
+  .hint { font-size: 15px; color: var(--fg-dim); margin: -4px 0 14px; }
+  .error { color: #FFE0E0; font-size: 16px; min-height: 22px; margin-top: 10px; }
+
+  /* Trial screen: everything sits in fixed-height slots so nothing shifts between trials. */
+  .progress { font-size: 15px; color: var(--fg-dim); margin: 0 0 40px; min-height: 20px; }
+  .triad {
+    display: flex; justify-content: center; align-items: center; gap: 56px;
+    font-size: 48px; letter-spacing: 0.04em; margin: 0 0 48px; min-height: 64px;
+  }
+  .trial-body { visibility: hidden; }
+  .trial-body.show { visibility: visible; }
+  #answer { text-transform: uppercase; }
+  #btn-submit { display: block; margin: 20px auto 0; }
+  .timer { width: 320px; max-width: 90%; margin: 36px auto 0; }
+  .timer-track { height: 6px; background: rgba(255,255,255,0.25); border-radius: 3px; overflow: hidden; }
+  #timer-fill { height: 100%; width: 100%; background: var(--fg); transform-origin: left center; }
+  #timer-text { font-size: 15px; color: var(--fg-dim); margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+
+  /* Feedback */
+  .fb-main { font-size: 32px; color: var(--fg); margin: 0 0 16px; }
+  .fb-sub { font-size: 22px; margin: 0; min-height: 34px; }
+  .fb-sub strong { color: var(--fg); letter-spacing: 0.04em; }
+
+  /* Solution-type prompt */
+  .sol-q { font-size: 28px; color: var(--fg); margin: 0 0 28px; }
+  .sol-btn {
+    display: block; width: min(620px, 100%); margin: 14px auto 0; padding: 16px 20px;
+    font-size: 22px; font-weight: bold; text-align: left;
+  }
+  .sol-btn span { display: block; font-size: 17px; font-weight: normal; margin-top: 4px; }
+
+  /* Results */
+  h2 { font-size: 22px; font-weight: normal; margin: 28px 0 8px; color: var(--fg); }
+  table { margin: 0 auto; border-collapse: collapse; font-size: 19px; }
+  th, td { padding: 8px 20px; border-bottom: 1px solid rgba(255,255,255,0.35); }
+  th { font-weight: normal; color: var(--fg-dim); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.lbl, th.lbl { text-align: left; }
+  .big { font-size: 26px; color: var(--fg); margin: 0; }
+  .note { font-size: 16px; color: var(--fg-dim); max-width: 720px; margin: 20px auto 0; }
+  #btn-download { font-size: 24px; padding: 16px 44px; }
+
+  @media (max-width: 640px) {
+    .triad { font-size: 28px; gap: 22px; }
+    table { font-size: 15px; }
+    th, td { padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+<div id="debug-badge" hidden>DEBUG MODE</div>
+
+<!-- Screen 1: Welcome / ID -->
+<div id="s-welcome" class="screen active">
+  <h1>Remote Associates Test</h1>
+  <label for="pid">Participant ID / Student ID</label>
+  <p class="hint">A random ID has been filled in. Keep it, or type your own.</p>
+  <input type="text" id="pid" autocomplete="off" spellcheck="false">
+  <div class="error" id="pid-err"></div>
+  <button id="btn-start">Start Experiment</button>
+</div>
+
+<!-- Screen 2: Task instructions -->
+<div id="s-instr1" class="screen">
+  <h1>Instructions</h1>
+  <div class="instr">
+    <p>On each trial you will see three words. Your job is to find a <strong>fourth word</strong> that goes with all three, making a common compound word or phrase with each one.</p>
+    <div class="example">CREAM &nbsp;&nbsp; SKATE &nbsp;&nbsp; WATER
+      <small>Answer: <strong>ICE</strong> (ice cream, ice skate, ice water)</small>
+    </div>
+    <p>Type your answer and press <kbd>ENTER</kbd> or click Submit. You get <strong>one answer</strong> per puzzle, and you have <strong>30 seconds</strong>. If time runs out, the puzzle counts as incorrect and the next one begins.</p>
+  </div>
+  <p class="press">Press <kbd>SPACE</kbd> to continue.</p>
+</div>
+
+<!-- Screen 3: Solution-type instructions -->
+<div id="s-instr2" class="screen">
+  <h1>How did you find the answer?</h1>
+  <div class="instr">
+    <p>Each time you solve a puzzle, you will be asked how the answer came to you. Choose the one that fits best:</p>
+    <dl>
+      <dt>Insight</dt>
+      <dd>The answer suddenly popped into your head, an &ldquo;Aha!&rdquo; moment. You may not be able to say how you got there.</dd>
+      <dt>Analysis</dt>
+      <dd>You worked it out step by step, trying candidate words one by one until one fit.</dd>
+      <dt>Guess</dt>
+      <dd>You weren&rsquo;t sure and just took a shot in the dark.</dd>
+    </dl>
+    <p>There are no right or wrong choices here. Just report what it felt like. There are 18 puzzles; some are easy and some are very hard.</p>
+  </div>
+  <p class="press">Press <kbd>SPACE</kbd> to begin.</p>
+</div>
+
+<!-- Trial -->
+<div id="s-trial" class="screen">
+  <p class="progress" id="progress"></p>
+  <div class="trial-body" id="trial-body">
+    <div class="triad"><span id="w1"></span><span id="w2"></span><span id="w3"></span></div>
+    <form id="answer-form" autocomplete="off">
+      <input type="text" id="answer" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="30" aria-label="Your answer">
+      <button type="submit" id="btn-submit">Submit</button>
+    </form>
+    <div class="timer">
+      <div class="timer-track"><div id="timer-fill"></div></div>
+      <p id="timer-text"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Feedback (incorrect / timeout) -->
+<div id="s-feedback" class="screen">
+  <p class="fb-main" id="fb-main"></p>
+  <p class="fb-sub" id="fb-sub"></p>
+</div>
+
+<!-- Solution-type prompt (correct answers only) -->
+<div id="s-solution" class="screen">
+  <p class="fb-sub" style="margin-bottom:18px">Correct!</p>
+  <p class="sol-q">How did you find this answer?</p>
+  <button class="sol-btn" data-type="Insight">Insight<span>It suddenly popped into my head / &ldquo;Aha!&rdquo; moment</span></button>
+  <button class="sol-btn" data-type="Analysis">Analysis<span>I systematically tested words one by one</span></button>
+  <button class="sol-btn" data-type="Guess">Guess<span>I just took a shot in the dark</span></button>
+</div>
+
+<!-- Blank inter-trial interval -->
+<div id="s-blank" class="screen"></div>
+
+<!-- End / Results -->
+<div id="s-end" class="screen">
+  <h1>Thank you!</h1>
+  <p class="big" id="res-total"></p>
+  <h2>Solved puzzles by solution type</h2>
+  <table>
+    <thead><tr><th class="lbl">Solution type</th><th>n</th><th>% of solved</th><th>Mean time (s)</th></tr></thead>
+    <tbody id="res-type"></tbody>
+  </table>
+  <h2>Accuracy by difficulty</h2>
+  <table>
+    <thead><tr><th class="lbl">Difficulty</th><th>Correct</th><th>% correct</th><th>Timeouts</th></tr></thead>
+    <tbody id="res-diff"></tbody>
+  </table>
+  <button id="btn-download">Download Data (CSV)</button>
+  <div class="error" id="dl-msg" style="color:var(--fg-dim)"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ======================= Stimuli =======================
+  // Mirrors conditions.csv in this folder. Compound remote associate problems
+  // (after Bowden & Jung-Beeman, 2003). `alt` lists other answers scored as correct.
+  const TRIADS = [
+    { words: ["COTTAGE", "SWISS", "CAKE"],     solution: "CHEESE", alt: [], difficulty: "easy" },
+    { words: ["NIGHT", "WRIST", "STOP"],       solution: "WATCH",  alt: [], difficulty: "easy" },
+    { words: ["SHOW", "LIFE", "ROW"],          solution: "BOAT",   alt: [], difficulty: "easy" },
+    { words: ["DEW", "COMB", "BEE"],           solution: "HONEY",  alt: [], difficulty: "easy" },
+    { words: ["FOUNTAIN", "BAKING", "POP"],    solution: "SODA",   alt: [], difficulty: "easy" },
+    { words: ["DUCK", "FOLD", "DOLLAR"],       solution: "BILL",   alt: [], difficulty: "easy" },
+    { words: ["SAFETY", "CUSHION", "POINT"],   solution: "PIN",    alt: [], difficulty: "medium" },
+    { words: ["FISH", "MINE", "RUSH"],         solution: "GOLD",   alt: [], difficulty: "medium" },
+    { words: ["PRINT", "BERRY", "BIRD"],       solution: "BLUE",   alt: [], difficulty: "medium" },
+    { words: ["OPERA", "HAND", "DISH"],        solution: "SOAP",   alt: [], difficulty: "medium" },
+    { words: ["FUR", "RACK", "TAIL"],          solution: "COAT",   alt: [], difficulty: "medium" },
+    { words: ["BASS", "COMPLEX", "SLEEP"],     solution: "DEEP",   alt: [], difficulty: "hard" },
+    { words: ["HIGH", "DISTRICT", "HOUSE"],    solution: "SCHOOL", alt: ["COURT"], difficulty: "hard" },
+    { words: ["MILL", "TOOTH", "DUST"],        solution: "SAW",    alt: [], difficulty: "hard" },
+    { words: ["CROSS", "RAIN", "TIE"],         solution: "BOW",    alt: [], difficulty: "hard" },
+    { words: ["TANK", "HILL", "SECRET"],       solution: "TOP",    alt: [], difficulty: "hard" },
+    { words: ["LIFT", "CARD", "MASK"],         solution: "FACE",   alt: [], difficulty: "hard" },
+    { words: ["HEALTH", "TAKER", "LESS"],      solution: "CARE",   alt: [], difficulty: "hard" },
+  ];
+
+  // ======================= Parameters =======================
+  // Timing (ms). Add ?debug=1 to the URL for a fast run-through.
+  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+  const LIMIT_MS    = DEBUG ? 6000 : 30000;   // time allowed per triad
+  const FEEDBACK_MS = DEBUG ? 300  : 1500;    // "incorrect" / "time's up" screen
+  const ITI_MS      = DEBUG ? 100  : 750;     // blank screen between trials
+
+  // ======================= State =======================
+  const EXP_NAME = "Lab8_RemoteAssociatesTest";
+  let participantId = "";
+  let rows = [];          // one row per trial (PsychoPy-style long format)
+  let t0 = 0;             // experiment clock zero (performance.now() at Start)
+  let frameMs = 1000 / 60;
+  let expInfo = {};
+  let started = false;
+  let finished = false;
+
+  // ======================= Helpers =======================
+  const $ = (id) => document.getElementById(id);
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
+
+  // Frame-locked screen updates, like win.flip() in PsychoPy: fn() runs in the animation
+  // frame and the frame's timestamp is returned as the onset/offset time.
+  const flip = (fn) => new Promise((r) => requestAnimationFrame((t) => { if (fn) fn(); r(t); }));
+
+  // Like flip(), but waits for the first frame at or after targetT (within half a frame).
+  function flipAt(targetT, fn) {
+    return new Promise((r) => {
+      function tick(t) {
+        if (t >= targetT - frameMs / 2) { if (fn) fn(); r(t); } else requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // Estimate the monitor refresh interval from 60 frames.
+  async function measureFrameRate() {
+    const ts = [];
+    for (let i = 0; i < 61; i++) ts.push(await flip());
+    const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b);
+    frameMs = d[Math.floor(d.length / 2)];
+    return 1000 / frameMs;
+  }
+
+  // Seconds on the experiment clock, rounded to 0.1 ms (PsychoPy logs times in seconds).
+  const sec = (t) => Math.round((t - t0) * 10) / 10000;
+  // A duration in seconds, rounded to 0.1 ms.
+  const dur = (ms) => Math.round(ms * 10) / 10000;
+
+  function pad(n, w = 2) { return String(n).padStart(w, "0"); }
+
+  // PsychoPy date format: 2026-10-07_09h54.12.345
+  function psychopyDate(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" +
+      pad(d.getHours()) + "h" + pad(d.getMinutes()) + "." + pad(d.getSeconds()) + "." + pad(d.getMilliseconds(), 3);
+  }
+
+  // Random 6-digit default participant ID, as in PsychoPy Builder.
+  function randomParticipantId() {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+    return pad(n, 6);
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  const evTime = (e) => (e.timeStamp > 0 ? e.timeStamp : performance.now());
+
+  function waitForSpace() {
+    return new Promise((resolve) => {
+      function onKey(e) {
+        if (e.repeat || e.code !== "Space") return;
+        e.preventDefault();
+        document.removeEventListener("keydown", onKey);
+        resolve(evTime(e));
+      }
+      document.addEventListener("keydown", onKey);
+    });
+  }
+
+  function beforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+
+  // Typed answer -> letters only, upper case ("  ice " -> "ICE").
+  const normalize = (s) => s.toUpperCase().replace(/[^A-Z]/g, "");
+
+  // ======================= Trial parts =======================
+  const answerEl = $("answer"), bodyEl = $("trial-body");
+
+  function hideTriad() { bodyEl.classList.remove("show"); }
+
+  // Wait for a submitted answer or the deadline, whichever comes first.
+  // Resolves with { timedOut, t, method, text }. On a timeout the triad is hidden
+  // in the same frame, so t is also the stimulus offset time.
+  function collectAnswer(on) {
+    return new Promise((resolve) => {
+      const deadline = on + LIMIT_MS;
+      const fill = $("timer-fill"), text = $("timer-text"), form = $("answer-form");
+      let done = false, rafId = 0, method = "enter";
+
+      function finish(res) {
+        if (done) return;
+        done = true;
+        cancelAnimationFrame(rafId);
+        clearTimeout(backup);
+        form.removeEventListener("submit", onSubmit);
+        $("btn-submit").removeEventListener("pointerdown", onPointer);
+        answerEl.removeEventListener("blur", onBlur);
+        resolve({ ...res, text: answerEl.value.trim().toUpperCase() });
+      }
+      function onPointer() { method = "button"; }
+      function onSubmit(e) {
+        e.preventDefault();
+        if (!normalize(answerEl.value)) { method = "enter"; answerEl.focus(); return; }  // ignore empty answers
+        finish({ timedOut: false, t: evTime(e), method });
+      }
+      // Keep the cursor in the box for the whole trial.
+      function onBlur() { setTimeout(() => { if (!done) answerEl.focus(); }, 0); }
+      function tick(t) {
+        if (t >= deadline - frameMs / 2) { hideTriad(); finish({ timedOut: true, t, method: "timeout" }); return; }
+        const left = Math.max(0, deadline - t);
+        fill.style.transform = "scaleX(" + (left / LIMIT_MS).toFixed(4) + ")";
+        text.textContent = Math.ceil(left / 1000) + " s";
+        rafId = requestAnimationFrame(tick);
+      }
+      // Backup timer: rAF pauses in background tabs, so make sure the trial still ends.
+      const backup = setTimeout(() => {
+        hideTriad();
+        finish({ timedOut: true, t: performance.now(), method: "timeout" });
+      }, Math.max(0, deadline - performance.now()) + 100);
+
+      form.addEventListener("submit", onSubmit);
+      $("btn-submit").addEventListener("pointerdown", onPointer);
+      answerEl.addEventListener("blur", onBlur);
+      rafId = requestAnimationFrame(tick);
+    });
+  }
+
+  function waitForSolutionType() {
+    return new Promise((resolve) => {
+      const btns = [...document.querySelectorAll(".sol-btn")];
+      function onClick(e) {
+        btns.forEach((b) => b.removeEventListener("click", onClick));
+        resolve({ type: e.currentTarget.dataset.type, t: evTime(e) });
+      }
+      btns.forEach((b) => b.addEventListener("click", onClick));
+    });
+  }
+
+  // ======================= Trial loop =======================
+  async function runTrials() {
+    const order = shuffle(TRIADS.map((_, idx) => idx));
+    hideTriad();
+    show("s-blank");
+    let next = (await flip()) + ITI_MS;
+
+    for (let i = 0; i < order.length; i++) {
+      const item = TRIADS[order[i]];
+      const itiEnd = next;
+
+      // Triad + answer box appear together; the cursor goes straight into the box.
+      const on = await flipAt(next, () => {
+        $("progress").textContent = "Puzzle " + (i + 1) + " of " + order.length;
+        item.words.forEach((w, k) => { $("w" + (k + 1)).textContent = w; });
+        answerEl.value = "";
+        $("timer-fill").style.transform = "scaleX(1)";
+        $("timer-text").textContent = Math.ceil(LIMIT_MS / 1000) + " s";
+        show("s-trial");
+        bodyEl.classList.add("show");
+        answerEl.focus();
+        if (DEBUG) $("debug-badge").textContent = "DEBUG MODE · answer: " + item.solution;
+      });
+      if (i > 0) rows[rows.length - 1]["iti.stopped"] = sec(on);
+
+      const ans = await collectAnswer(on);
+      const correct = !ans.timedOut && [item.solution, ...item.alt].includes(normalize(ans.text));
+
+      const row = {
+        phase: "test",
+        word1: item.words[0], word2: item.words[1], word3: item.words[2],
+        solution: item.solution,
+        alt_solutions: item.alt.join(";"),
+        difficulty: item.difficulty,
+        "trials.thisRepN": 0,
+        "trials.thisTrialN": i,
+        "trials.thisN": i,
+        "trials.thisIndex": order[i],
+        "trial.started": sec(on),
+        "triad.started": sec(on),
+        "resp_box.started": sec(on),
+        "resp_box.text": ans.text,
+        "resp_box.corr": correct ? 1 : 0,
+        "resp_box.rt": ans.timedOut ? "" : dur(ans.t - on),
+        "resp_box.timedOut": ans.timedOut ? 1 : 0,
+        "resp_box.submitMethod": ans.method,
+        TrialNumber: i + 1,
+        Triad: item.words.join(" / "),
+        TargetWord: item.solution,
+        ParticipantResponse: ans.text,
+        Accuracy: correct ? 1 : 0,
+        ReactionTime: ans.timedOut ? "" : Math.round(ans.t - on),   // ms, triad onset -> submit
+        SolutionType: ans.timedOut ? "Timeout" : (correct ? "" : "Incorrect"),
+      };
+      rows.push(row);
+
+      let off;
+      if (correct) {
+        // Solution-type prompt replaces the triad immediately.
+        const promptOn = await flip(() => { hideTriad(); show("s-solution"); });
+        row["triad.stopped"] = row["trial.stopped"] = sec(promptOn);
+        row["solution_prompt.started"] = sec(promptOn);
+        const sol = await waitForSolutionType();
+        row["solution_btn.clicked"] = sol.type;
+        row["solution_btn.rt"] = dur(sol.t - promptOn);
+        row.SolutionType = sol.type;
+        off = await flip(() => show("s-blank"));
+        row["solution_prompt.stopped"] = sec(off);
+      } else {
+        const fbOn = await flip(() => {
+          hideTriad();
+          $("fb-main").textContent = ans.timedOut ? "Time’s up" : "Incorrect";
+          $("fb-sub").innerHTML = "The answer was <strong>" + item.solution + "</strong>";
+          show("s-feedback");
+        });
+        // On a timeout the triad was already hidden in the deadline frame.
+        row["triad.stopped"] = row["trial.stopped"] = sec(ans.timedOut ? ans.t : fbOn);
+        row["feedback.started"] = sec(fbOn);
+        off = await flipAt(fbOn + FEEDBACK_MS, () => show("s-blank"));
+        row["feedback.stopped"] = sec(off);
+      }
+      row["iti.started"] = sec(off);
+      next = off + ITI_MS;
+    }
+    rows[rows.length - 1]["iti.stopped"] = sec(await flipAt(next));
+    if (DEBUG) $("debug-badge").textContent = "DEBUG MODE";
+  }
+
+  // ======================= Results & CSV =======================
+  function showResults() {
+    const trials = rows.filter((d) => d.phase === "test");
+    const solved = trials.filter((d) => d.Accuracy === 1);
+    $("res-total").textContent = "You solved " + solved.length + " of " + trials.length + " puzzles.";
+
+    const typeBody = $("res-type");
+    typeBody.innerHTML = "";
+    for (const type of ["Insight", "Analysis", "Guess"]) {
+      const t = solved.filter((d) => d.SolutionType === type);
+      const pct = solved.length ? (100 * t.length / solved.length).toFixed(0) + "%" : "-";
+      const rt = t.length ? (t.reduce((s, d) => s + d.ReactionTime, 0) / t.length / 1000).toFixed(2) : "-";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="lbl">${type}</td><td class="num">${t.length}</td>` +
+        `<td class="num">${pct}</td><td class="num">${rt}</td>`;
+      typeBody.appendChild(tr);
+    }
+
+    const diffBody = $("res-diff");
+    diffBody.innerHTML = "";
+    for (const diff of ["easy", "medium", "hard"]) {
+      const t = trials.filter((d) => d.difficulty === diff);
+      const c = t.filter((d) => d.Accuracy === 1).length;
+      const to = t.filter((d) => d.SolutionType === "Timeout").length;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="lbl">${diff[0].toUpperCase() + diff.slice(1)}</td>` +
+        `<td class="num">${c} / ${t.length}</td>` +
+        `<td class="num">${t.length ? (100 * c / t.length).toFixed(0) + "%" : "-"}</td>` +
+        `<td class="num">${to}</td>`;
+      diffBody.appendChild(tr);
+    }
+    show("s-end");
+  }
+
+  // Column order follows PsychoPy: conditions, loop counters, routine/component data,
+  // then the expInfo columns. Cells that don't apply to a row are left empty.
+  const CSV_HEADER = [
+    "phase",
+    "word1", "word2", "word3", "solution", "alt_solutions", "difficulty",
+    "trials.thisRepN", "trials.thisTrialN", "trials.thisN", "trials.thisIndex",
+    "trial.started", "triad.started", "resp_box.started",
+    "resp_box.text", "resp_box.corr", "resp_box.rt", "resp_box.timedOut", "resp_box.submitMethod",
+    "triad.stopped", "trial.stopped",
+    "feedback.started", "feedback.stopped",
+    "solution_prompt.started", "solution_btn.clicked", "solution_btn.rt", "solution_prompt.stopped",
+    "iti.started", "iti.stopped",
+    "TrialNumber", "Triad", "TargetWord", "ParticipantResponse", "Accuracy", "ReactionTime", "SolutionType",
+    "participant", "session", "date", "expName", "expStart", "frameRate", "debug",
+  ];
+
+  function csvCell(v) {
+    let s = String(v ?? "");
+    // Typed answers are free text: keep a spreadsheet from reading one as a formula.
+    if (/^[=+\-@]/.test(s) && isNaN(Number(s))) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function safeId() { return participantId.replace(/[^A-Za-z0-9_-]+/g, "_") || "participant"; }
+
+  function downloadCSV() {
+    const lines = [CSV_HEADER.join(",")]
+      .concat(rows.map((r) => CSV_HEADER.map((h) => csvCell({ ...r, ...expInfo }[h])).join(",")));
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    // PsychoPy file name: <participant>_<expName>_<date>.csv
+    a.download = safeId() + "_" + EXP_NAME + "_" + (DEBUG ? "DEBUG_" : "") + expInfo.date + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return a.download;
+  }
+
+  // ======================= Flow =======================
+  async function runExperiment() {
+    window.addEventListener("beforeunload", beforeUnload);
+    t0 = performance.now();
+    const startDate = new Date();
+    rows = [];
+    expInfo = {
+      participant: participantId,
+      session: "001",
+      date: psychopyDate(startDate),
+      expName: EXP_NAME,
+      expStart: startDate.toISOString(),
+      frameRate: "",
+      debug: DEBUG ? 1 : 0,
+    };
+
+    show("s-instr1");
+    // Measure the refresh rate while the instructions are on screen.
+    const fps = measureFrameRate().then((r) => { expInfo.frameRate = Math.round(r * 100) / 100; });
+    await waitForSpace();
+    show("s-instr2");
+    await waitForSpace();
+    await fps;
+
+    await runTrials();
+
+    finished = true;
+    window.removeEventListener("beforeunload", beforeUnload);
+    showResults();
+    // Save the data automatically; the button stays as a backup.
+    const name = downloadCSV();
+    $("dl-msg").textContent = "Your data was downloaded automatically as " + name +
+      ". If you can't find it, click the button to download it again.";
+  }
+
+  function tryStart() {
+    const v = $("pid").value.trim();
+    if (started) return;
+    if (!v) { $("pid-err").textContent = "Please enter your ID."; $("pid").focus(); return; }
+    started = true;
+    participantId = v;
+    $("btn-start").disabled = true;
+    runExperiment();
+  }
+
+  $("btn-start").addEventListener("click", tryStart);
+  $("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+  $("btn-download").addEventListener("click", () => {
+    if (finished) $("dl-msg").textContent = "Downloaded " + downloadCSV();
+  });
+  if (DEBUG) $("debug-badge").hidden = false;
+  $("pid").value = randomParticipantId();
+  $("pid").focus();
+  $("pid").select();
+
+  // Test hook (debug only): lets an automated run read the rows and the CSV text.
+  if (DEBUG) window.__lab = { rows: () => rows, header: CSV_HEADER, info: () => expInfo };
+})();
+</script>
+</body>
+</html>
