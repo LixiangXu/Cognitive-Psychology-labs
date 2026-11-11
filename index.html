@@ -4,78 +4,73 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cognitive Psychology Labs — PSY 221</title>
+    <meta name="description" content="Interactive cognitive psychology experiments and in-class demonstrations for PSY 221 at Wake Forest University.">
     <link rel="stylesheet" href="./styles.css">
   </head>
-  <body>
-    <header>
-      <h1>Cognitive Psychology Labs</h1>
-      <p>PSY 221 A/B — Interactive PsychoPy Demonstrations</p>
-    </header>
-    <main>
-      <div class="lab-grid">
-        <a class="lab-card" href="./LabDemo_DonderRTT/index.html">
-          <h2>Donders' Reaction Time Task</h2>
-          <p>A classic choice- and simple-reaction-time experiment demonstrating Donders' subtractive method.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>
-        <!-- Add new labs by copying a .lab-card block above and pointing it at the new lab's folder -->
-        <a class="lab-card" href="./Lab1_FeatureSearch/index.html">
-          <h2>Feature Search Task</h2>
-          <p>A visual search experiment demonstrating the difference between feature and conjunction searches.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>
-        <!-- new lab: Stroop Effect -->
-        <a class="lab-card" href="./Lab2_StroopEffect/index.html">
-          <h2>Stroop Effect</h2>
-          <p>A classic attention experiment demonstrating the interference of automatic and controlled processes.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>
-        <!-- new lab: Spatial Span and N-Back -->
-        <a class="lab-card" href="./Lab3_SpatialSpan_and_NBack/index.html">
-          <h2>Spatial Span and N-Back</h2>
-          <p>An experiment measuring working memory capacity and attention.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>
-        <!-- new lab: Generation Effect -->
-        <a class="lab-card" href="./Lab4_GenerationRecall/index.html">
-          <h2>Generation Effect</h2>
-          <p>An experiment investigating the generation effect in memory.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>
-        <!-- new lab: DRM Fasle Memory -->
-        <a class="lab-card" href="./Lab5_DRMFalseMemory/index.html">
-          <h2>DRM False Memory</h2>
-          <p>An experiment investigating the false memory effect in recognition.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>        
-        <!-- new lab: Dot Pattern Category -->
-        <a class="lab-card" href="./Lab6_DotPatternCategory/index.html">
-          <h2>Dot Pattern Category</h2>
-          <p>An experiment investigating the categorization of dot patterns.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>   
-        <!-- In-class demo: Defuse the bomb -->
-        <a class="lab-card" href="./Defuse_the_Bomb/index.html">
-          <h2>Defuse the Bomb</h2>
-          <p>An interactive game for Language and Conversation.</p>
-          <span class="go">Launch game &rarr;</span>
-        </a>     
-        <!-- new lab: Visual Imagery -->
-        <a class="lab-card" href="./Lab7_VisualImagery/index.html">
-          <h2>Visual Imagery</h2>
-          <p>An experiment investigating the role of visual imagery in memory.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>  
-        <!-- new lab: Remote Associates Test -->
-        <a class="lab-card" href="./Lab8_RemoteAssociatesTest/index.html">
-          <h2>Remote Associates Test</h2>
-          <p>An experiment investigating insight in problem solving.</p>
-          <span class="go">Launch lab &rarr;</span>
-        </a>
+  <body class="page-index">
+    <!--
+      To add or change a lab, edit labs.js. This page is built from that list;
+      you do not need to edit the HTML below.
+    -->
+    <header class="site-header">
+      <div class="wrap">
+        <h1 data-site="title">Cognitive Psychology Labs</h1>
+        <p data-site="subtitle">PSY 221 A/B · Interactive experiments and in-class demonstrations</p>
       </div>
+    </header>
+
+    <main class="wrap">
+      <div id="problems"></div>
+
+      <section id="tools" class="tools" aria-label="Find a lab">
+        <div class="tools-row">
+          <label class="search">
+            <span class="visually-hidden">Search labs</span>
+            <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="search" type="search" placeholder="Search by title, topic or author" autocomplete="off">
+            <kbd title="Press / to search">/</kbd>
+          </label>
+          <div class="segmented" role="group" aria-label="Show">
+            <button type="button" data-type="all" aria-pressed="true">All</button>
+            <button type="button" data-type="lab" aria-pressed="false">Labs</button>
+            <button type="button" data-type="demo" aria-pressed="false">Demos</button>
+          </div>
+          <label class="sort">
+            <span>Sort</span>
+            <select id="sort">
+              <option value="course">Course order</option>
+              <option value="az">A to Z</option>
+            </select>
+          </label>
+        </div>
+        <div id="tag-bar" class="tag-bar" role="group" aria-label="Filter by topic"></div>
+        <div class="status-row">
+          <p id="count" class="count" aria-live="polite"></p>
+          <button id="clear" type="button" class="btn-mini" hidden>Clear filters</button>
+        </div>
+      </section>
+
+      <div id="grid" class="grid"></div>
+
+      <div id="empty" class="notice" hidden>
+        <strong>No labs match</strong>
+        <p>Try a different word or remove a filter.</p>
+        <button id="empty-clear" type="button" class="btn-mini">Clear filters</button>
+      </div>
+
+      <noscript><p class="notice">This page needs JavaScript to show the list of labs.</p></noscript>
+
+      <section id="references" class="references" hidden>
+        <h2>References</h2>
+        <ol id="ref-list" class="ref-list"></ol>
+      </section>
     </main>
-    <footer>
-      <p>Wake Forest University &middot; Department of Psychology</p>
+
+    <footer class="site-footer">
+      <p data-site="footer">Wake Forest University &middot; Department of Psychology</p>
     </footer>
+
+    <script src="./labs.js"></script>
+    <script src="./site.js"></script>
   </body>
 </html>
