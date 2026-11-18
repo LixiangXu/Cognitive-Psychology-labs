@@ -320,6 +320,26 @@ window.LABS = [
     ],
     chapter: "Goldstein, Ch. 12",
     analysis: ""
+  },
+
+  {
+    id: "beat-the-bot",
+    title: "Beat the Bot",
+    type: "demo",
+    folder: "Beat_the_Bot",
+    cover: "covers/beat-the-bot.jpg",
+    tags: ["Decision making"],
+    summary: "Rock, paper, scissors against a program that learns your habits. It locks its move before you choose.",
+    about: [
+      "Against a truly random player, no strategy wins more than a third of the rounds. So the bot can only get ahead by finding patterns in your moves. It keeps simple counts of what you tend to play next and bets on whichever count has been right lately.",
+      "The page reports how often the bot guessed your move. Anything above 33% measures how predictable you were. Try to play randomly and see whether the number drops."
+    ],
+    references: [
+      { cite: "Wang, Z., Xu, B., & Zhou, H.-J. (2014). Social cycling and conditional responses in the Rock-Paper-Scissors game. *Scientific Reports, 4*, 5830.",
+        doi: "10.1038/srep05830" }
+    ],
+    chapter: "Goldstein, Ch. 13",
+    analysis: ""
   }
 
 ];
