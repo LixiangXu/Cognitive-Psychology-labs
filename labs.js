@@ -281,6 +281,32 @@ window.LABS = [
     conditions: ["conditions.csv"]
   },
 
+  {
+    id: "lab9",
+    number: 9,
+    title: "Risk Preference Task",
+    type: "lab",
+    folder: "Lab9_RiskPreference",
+    cover: "covers/lab9.jpg",
+    tags: ["Decision making"],
+    duration: "6 min",
+    summary: "Choose between a sure amount of money and a gamble. 54 quick choices about winning or losing; go with your gut.",
+    about: [
+      "On every trial one option is certain (win or lose $50) and the other is a gamble that pays a larger amount or nothing. The size of the gamble changes from trial to trial, and a few trials check that you are reading the options.",
+      "Prospect theory says people weigh outcomes as gains and losses from a reference point, and that the value of money is not a straight line: most people avoid risk when choosing between gains and seek risk when choosing between losses. Each person's choices give the gamble size at which they switch, which is used to fit a logistic curve and estimate the shape of their value function."
+    ],
+    references: [
+      { cite: "Kahneman, D., & Tversky, A. (1979). Prospect theory: An analysis of decision under risk. *Econometrica, 47*(2), 263–291.",
+        doi: "10.2307/1914185" },
+      { cite: "Tversky, A., & Kahneman, D. (1992). Advances in prospect theory: Cumulative representation of uncertainty. *Journal of Risk and Uncertainty, 5*(4), 297–323.",
+        doi: "10.1007/BF00122574" }
+    ],
+    chapter: "Goldstein, Ch. 13",
+    analysis: "",
+    debug: true,
+    conditions: ["conditions.csv"]
+  },
+
   /* ---------- In-class demos and games (no lab number) ---------- */
 
   {

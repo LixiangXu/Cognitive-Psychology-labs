@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 9: Risk Preference Task</title>
+<style>
+  :root {
+    --bg: #7F7F7F;
+    --fg: #FFFFFF;
+    --fg-dim: #F0F0F0;
+    --input-bg: #6E6E6E;
+    --ink: #4A4A4A;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--fg);
+    font-family: Arial, Helvetica, "Helvetica Neue", system-ui, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  .screen {
+    display: none; width: 100%; max-width: 980px; padding: 24px 16px;
+    text-align: center;
+  }
+  .screen.active { display: block; }
+  h1 { font-size: 32px; font-weight: normal; margin: 0 0 24px; }
+  p, li { font-size: 20px; line-height: 1.5; color: var(--fg-dim); }
+  .instr { text-align: left; max-width: 720px; margin: 0 auto; }
+  .instr .example {
+    text-align: center; font-size: 22px; color: var(--fg);
+    margin: 18px 0; padding: 14px; border: 1.5px solid rgba(255,255,255,0.5); border-radius: 4px;
+  }
+  .instr .example small { display: block; font-size: 17px; color: var(--fg-dim); margin: 6px 0; }
+
+  input[type=text] {
+    font: inherit; font-size: 28px; text-align: center;
+    width: 320px; max-width: 90%; padding: 10px 12px;
+    background: var(--input-bg); color: var(--fg);
+    border: 2px solid var(--fg-dim); border-radius: 4px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--fg); }
+  button {
+    font: inherit; font-size: 20px; padding: 12px 32px; margin-top: 28px;
+    background: var(--fg); color: var(--ink); font-weight: bold;
+    border: 2px solid var(--fg); border-radius: 4px; cursor: pointer;
+  }
+  button:hover { background: var(--fg-dim); }
+  label { display: block; font-size: 20px; margin-bottom: 12px; color: var(--fg-dim); }
+  #debug-badge {
+    position: fixed; top: 8px; left: 8px; padding: 2px 8px; font-size: 13px;
+    border: 1px solid var(--fg); border-radius: 3px; opacity: 0.8;
+  }
+  .hint { font-size: 15px; color: var(--fg-dim); margin: -4px 0 14px; }
+  .error { color: #FFE0E0; font-size: 16px; min-height: 22px; margin-top: 10px; }
+
+  /* Trial screen: two equal, fixed-size option buttons so nothing shifts between trials. */
+  .progress { font-size: 15px; color: var(--fg-dim); margin: 0 0 28px; min-height: 20px; }
+  .question { font-size: 24px; color: var(--fg); margin: 0 0 32px; }
+  .options { display: flex; justify-content: center; gap: 4%; }
+  .opt {
+    flex: 0 0 46%; height: 240px; margin: 0; padding: 16px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background: transparent; color: var(--fg); font-weight: normal; font-size: 28px; line-height: 1.25;
+    border: 3px solid var(--fg); border-radius: 8px;
+  }
+  .opt:hover { background: rgba(255,255,255,0.12); }
+  .opt b { font-weight: bold; }
+
+  /* Results */
+  h2 { font-size: 22px; font-weight: normal; margin: 28px 0 8px; color: var(--fg); }
+  table { margin: 0 auto; border-collapse: collapse; font-size: 19px; }
+  th, td { padding: 7px 20px; border-bottom: 1px solid rgba(255,255,255,0.35); }
+  th { font-weight: normal; color: var(--fg-dim); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.lbl, th.lbl { text-align: left; }
+  .note { font-size: 16px; color: var(--fg-dim); max-width: 720px; margin: 16px auto 0; }
+  #btn-download { font-size: 24px; padding: 16px 44px; }
+
+  @media (max-width: 640px) {
+    .opt { font-size: 18px; height: 200px; padding: 8px; }
+    .question { font-size: 20px; }
+    table { font-size: 15px; }
+    th, td { padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+<div id="debug-badge" hidden>DEBUG MODE</div>
+
+<!-- Screen 1: Welcome / ID -->
+<div id="s-welcome" class="screen active">
+  <h1>Risk Preference Task</h1>
+  <label for="pid">Participant ID / Student ID</label>
+  <p class="hint">A random ID has been filled in. Keep it, or type your own.</p>
+  <input type="text" id="pid" autocomplete="off" spellcheck="false">
+  <div class="error" id="pid-err"></div>
+  <button id="btn-start">Start Experiment</button>
+</div>
+
+<!-- Screen 2: Instructions -->
+<div id="s-instr" class="screen">
+  <h1>Instructions</h1>
+  <div class="instr">
+    <p>On each trial you will choose between two options about money: a <strong>sure thing</strong> and a <strong>gamble</strong>. Sometimes the options are about <strong>winning</strong> money and sometimes about <strong>losing</strong> money, and the amounts and chances change from trial to trial, so read each one carefully.</p>
+    <div class="example">100% chance to win $50
+      <small>or</small>
+      50% chance to win $120, 50% chance to win $0
+    </div>
+    <p>Imagine this is <strong>real money</strong>. There are no right or wrong answers. Don&rsquo;t calculate; go with your <strong>gut preference</strong>.</p>
+    <p>Click the option you prefer. The two options switch sides from trial to trial. There are <span id="n-trials">54</span> choices, and you can go at your own pace.</p>
+  </div>
+  <button id="btn-begin">Begin</button>
+</div>
+
+<!-- Trial -->
+<div id="s-trial" class="screen">
+  <p class="progress" id="progress"></p>
+  <p class="question">Which do you prefer?</p>
+  <div class="options">
+    <button class="opt" id="opt-left" data-side="left"></button>
+    <button class="opt" id="opt-right" data-side="right"></button>
+  </div>
+</div>
+
+<!-- Blank inter-trial interval -->
+<div id="s-blank" class="screen"></div>
+
+<!-- End / Results -->
+<div id="s-end" class="screen">
+  <h1>Thank you!</h1>
+  <h2>How often you chose the gamble</h2>
+  <table>
+    <thead><tr><th class="lbl">Domain</th><th>Chose gamble</th><th>% gamble</th><th>Median RT (s)</th></tr></thead>
+    <tbody id="res-domain"></tbody>
+  </table>
+  <h2>Gambles chosen at each gamble amount</h2>
+  <table>
+    <thead><tr><th class="lbl">Gamble amount</th><th>Gains</th><th>Losses</th></tr></thead>
+    <tbody id="res-amount"></tbody>
+  </table>
+  <p class="note">These tables show the 50/50 gambles. The sure amount was always $50, so a 50/50 gamble of $100 has the same expected value as the sure thing.</p>
+  <p class="note" id="res-p80"></p>
+  <p class="note" id="res-checks"></p>
+  <button id="btn-download">Download Data (CSV)</button>
+  <div class="error" id="dl-msg" style="color:var(--fg-dim)"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ======================= Stimuli =======================
+  // Mirrors conditions.csv in this folder. Amounts are absolute values (dollars).
+  // Main trials: 2 domains x 10 gamble amounts x 2 sides = 40. Each gamble amount appears
+  // twice per domain, once with the gamble on the left and once on the right.
+  // The gamble pays Gamble_Amount with probability Gamble_Probability, otherwise Gamble_Other_Amount.
+  const SURE_AMOUNT = 50;
+  const GAMBLE_AMOUNTS = [60, 75, 90, 100, 110, 120, 135, 150, 175, 200];
+  const GAMBLE_P = 0.5;
+  // 80-20 trials: 2 domains x 5 amounts = 10. At 80% a gamble of $62.50 matches the sure $50.
+  const P80 = 0.8;
+  const P80_AMOUNTS = [55, 65, 75, 90, 110];
+  const cond = (Trial_Type, Domain, Sure_Amount, Gamble_Probability, Gamble_Amount, Gamble_Other_Amount, Gamble_Side, Correct_Choice) => ({
+    Trial_Type, Domain, Sure_Amount, Gamble_Probability, Gamble_Amount, Gamble_Other_Amount,
+    Objective_Expected_Value:
+      Math.round((Gamble_Probability * Gamble_Amount + (1 - Gamble_Probability) * Gamble_Other_Amount) * 100) / 100,
+    Gamble_Side, Correct_Choice,
+  });
+  const CONDITIONS = [];
+  for (const Domain of ["Gain", "Loss"])
+    for (const Gamble_Amount of GAMBLE_AMOUNTS)
+      for (const Gamble_Side of ["left", "right"])
+        CONDITIONS.push(cond("main", Domain, SURE_AMOUNT, GAMBLE_P, Gamble_Amount, 0, Gamble_Side, ""));
+  // Each amount appears once per domain; the gamble side alternates, and is opposite in the two domains.
+  ["Gain", "Loss"].forEach((Domain, d) =>
+    P80_AMOUNTS.forEach((Gamble_Amount, k) =>
+      CONDITIONS.push(cond("probability_80", Domain, SURE_AMOUNT, P80, Gamble_Amount, 0,
+        (k + d) % 2 === 0 ? "left" : "right", ""))));
+  // Attention checks: one option is at least as good in every outcome, so anyone who reads
+  // the options has an obvious answer. Balanced over domain, correct option and correct side.
+  // Exclude these rows (Trial_Type != "main") before fitting models.
+  CONDITIONS.push(
+    cond("attention_check", "Gain", 20, GAMBLE_P, 50, 20, "left",  "Gamble"),
+    cond("attention_check", "Gain", 50, GAMBLE_P, 50, 0,  "left",  "Sure"),
+    cond("attention_check", "Loss", 50, GAMBLE_P, 50, 0,  "right", "Gamble"),
+    cond("attention_check", "Loss", 20, GAMBLE_P, 50, 20, "right", "Sure"),
+  );
+
+  // ======================= Parameters =======================
+  // Timing (ms). Add ?debug=1 to the URL for a fast run-through.
+  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+  const ITI_MS = DEBUG ? 100 : 500;   // blank screen between trials
+
+  // ======================= State =======================
+  const EXP_NAME = "Lab9_RiskPreference";
+  let participantId = "";
+  let rows = [];          // one row per trial (PsychoPy-style long format)
+  let t0 = 0;             // experiment clock zero (performance.now() at Start)
+  let frameMs = 1000 / 60;
+  let expInfo = {};
+  let started = false;
+  let finished = false;
+
+  // ======================= Helpers =======================
+  const $ = (id) => document.getElementById(id);
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
+
+  // Frame-locked screen updates, like win.flip() in PsychoPy: fn() runs in the animation
+  // frame and the frame's timestamp is returned as the onset/offset time.
+  const flip = (fn) => new Promise((r) => requestAnimationFrame((t) => { if (fn) fn(); r(t); }));
+
+  // Like flip(), but waits for the first frame at or after targetT (within half a frame).
+  function flipAt(targetT, fn) {
+    return new Promise((r) => {
+      function tick(t) {
+        if (t >= targetT - frameMs / 2) { if (fn) fn(); r(t); } else requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // Estimate the monitor refresh interval from 60 frames.
+  async function measureFrameRate() {
+    const ts = [];
+    for (let i = 0; i < 61; i++) ts.push(await flip());
+    const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b);
+    frameMs = d[Math.floor(d.length / 2)];
+    return 1000 / frameMs;
+  }
+
+  // Seconds on the experiment clock, rounded to 0.1 ms (PsychoPy logs times in seconds).
+  const sec = (t) => Math.round((t - t0) * 10) / 10000;
+  // A duration in seconds, rounded to 0.1 ms.
+  const dur = (ms) => Math.round(ms * 10) / 10000;
+
+  function pad(n, w = 2) { return String(n).padStart(w, "0"); }
+
+  // PsychoPy date format: 2026-10-07_09h54.12.345
+  function psychopyDate(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" +
+      pad(d.getHours()) + "h" + pad(d.getMinutes()) + "." + pad(d.getSeconds()) + "." + pad(d.getMilliseconds(), 3);
+  }
+
+  // Random 6-digit default participant ID, as in PsychoPy Builder.
+  function randomParticipantId() {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+    return pad(n, 6);
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  const evTime = (e) => (e.timeStamp > 0 ? e.timeStamp : performance.now());
+
+  function waitForClick(el) {
+    return new Promise((resolve) => {
+      el.addEventListener("click", (e) => resolve(evTime(e)), { once: true });
+    });
+  }
+
+  function beforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+
+  // ======================= Trial parts =======================
+  const optEls = { left: $("opt-left"), right: $("opt-right") };
+
+  // Button text for the two options. "win"/"lose" is bold so the domain is easy to see.
+  function sureHTML(c) {
+    const verb = c.Domain === "Gain" ? "win" : "lose";
+    return `<span>100% chance to <b>${verb}</b> $${c.Sure_Amount}</span>`;
+  }
+  function gambleHTML(c) {
+    const verb = c.Domain === "Gain" ? "win" : "lose";
+    const pct = Math.round(c.Gamble_Probability * 100);
+    return `<span>${pct}% chance to <b>${verb}</b> $${c.Gamble_Amount}</span>` +
+           `<span>${100 - pct}% chance to <b>${verb}</b> $${c.Gamble_Other_Amount}</span>`;
+  }
+
+  // Wait for a click on either option. Resolves with { side, t }.
+  function waitForChoice() {
+    return new Promise((resolve) => {
+      const btns = Object.values(optEls);
+      function onClick(e) {
+        btns.forEach((b) => b.removeEventListener("click", onClick));
+        resolve({ side: e.currentTarget.dataset.side, t: evTime(e) });
+      }
+      btns.forEach((b) => b.addEventListener("click", onClick));
+    });
+  }
+
+  // ======================= Trial loop =======================
+  async function runTrials() {
+    const order = shuffle(CONDITIONS.map((_, idx) => idx));   // gains and losses mixed
+    show("s-blank");
+    let next = (await flip()) + ITI_MS;
+
+    for (let i = 0; i < order.length; i++) {
+      const c = CONDITIONS[order[i]];
+      const sureSide = c.Gamble_Side === "left" ? "right" : "left";
+
+      // Both options appear together in one frame.
+      const on = await flipAt(next, () => {
+        $("progress").textContent = "Choice " + (i + 1) + " of " + order.length;
+        optEls[c.Gamble_Side].innerHTML = gambleHTML(c);
+        optEls[sureSide].innerHTML = sureHTML(c);
+        show("s-trial");
+      });
+      if (i > 0) rows[rows.length - 1]["iti.stopped"] = sec(on);
+
+      const resp = await waitForChoice();
+      const choseGamble = resp.side === c.Gamble_Side;
+      const off = await flip(() => show("s-blank"));
+
+      rows.push({
+        phase: "choice",
+        ...c,
+        "trials.thisRepN": 0,
+        "trials.thisTrialN": i,
+        "trials.thisN": i,
+        "trials.thisIndex": order[i],
+        "trial.started": sec(on),
+        "trial.stopped": sec(off),
+        "sure_btn.started": sec(on),
+        "sure_btn.stopped": sec(off),
+        "gamble_btn.started": sec(on),
+        "gamble_btn.stopped": sec(off),
+        "iti.started": sec(off),
+        "iti.stopped": "",
+        "choice_mouse.clicked_name": choseGamble ? "gamble_btn" : "sure_btn",
+        "choice_mouse.clicked_side": resp.side,
+        "choice_mouse.rt": dur(resp.t - on),
+        "choice_mouse.started": sec(on),
+        Trial_Number: i + 1,
+        Choice_String: choseGamble ? "Gamble" : "Sure",
+        Chose_Gamble_Binary: choseGamble ? 1 : 0,
+        // 1/0 on attention check trials, empty on main trials.
+        Attention_Check_Correct: c.Trial_Type === "attention_check"
+          ? ((choseGamble ? "Gamble" : "Sure") === c.Correct_Choice ? 1 : 0) : "",
+        ReactionTime_ms: Math.round(resp.t - on),   // ms, options onset -> click
+      });
+      next = off + ITI_MS;
+    }
+    rows[rows.length - 1]["iti.stopped"] = sec(await flipAt(next));
+  }
+
+  // ======================= Results & CSV =======================
+  function median(xs) {
+    const s = xs.slice().sort((a, b) => a - b), m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+
+  function showResults() {
+    // Tables use the main trials only; attention checks are reported separately.
+    const trials = rows.filter((d) => d.phase === "choice" && d.Trial_Type === "main");
+    const checks = rows.filter((d) => d.Trial_Type === "attention_check");
+    $("res-checks").textContent = "Attention checks passed: " +
+      checks.filter((d) => d.Attention_Check_Correct === 1).length + " of " + checks.length;
+    const nGamble = (t) => t.filter((d) => d.Chose_Gamble_Binary === 1).length;
+    const p80 = (dom) => {
+      const t = rows.filter((d) => d.Trial_Type === "probability_80" && d.Domain === dom);
+      return nGamble(t) + " of " + t.length;
+    };
+    $("res-p80").textContent = "80% gambles chosen: gains " + p80("Gain") + ", losses " + p80("Loss");
+
+    const domBody = $("res-domain");
+    domBody.innerHTML = "";
+    for (const [dom, label] of [["Gain", "Gains"], ["Loss", "Losses"]]) {
+      const t = trials.filter((d) => d.Domain === dom);
+      const g = nGamble(t);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="lbl">${label}</td><td class="num">${g} / ${t.length}</td>` +
+        `<td class="num">${t.length ? (100 * g / t.length).toFixed(0) + "%" : "-"}</td>` +
+        `<td class="num">${t.length ? (median(t.map((d) => d.ReactionTime_ms)) / 1000).toFixed(2) : "-"}</td>`;
+      domBody.appendChild(tr);
+    }
+
+    const amtBody = $("res-amount");
+    amtBody.innerHTML = "";
+    for (const amt of GAMBLE_AMOUNTS) {
+      const cell = (dom) => {
+        const t = trials.filter((d) => d.Domain === dom && d.Gamble_Amount === amt);
+        return `<td class="num">${nGamble(t)} / ${t.length}</td>`;
+      };
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="lbl">$${amt}</td>` + cell("Gain") + cell("Loss");
+      amtBody.appendChild(tr);
+    }
+    show("s-end");
+  }
+
+  // Column order follows PsychoPy: conditions, loop counters, routine/component timing,
+  // responses, then the expInfo columns.
+  const CSV_HEADER = [
+    "phase",
+    "Trial_Type", "Domain", "Sure_Amount", "Gamble_Probability", "Gamble_Amount", "Gamble_Other_Amount",
+    "Objective_Expected_Value", "Gamble_Side", "Correct_Choice",
+    "trials.thisRepN", "trials.thisTrialN", "trials.thisN", "trials.thisIndex",
+    "trial.started", "trial.stopped",
+    "sure_btn.started", "sure_btn.stopped", "gamble_btn.started", "gamble_btn.stopped",
+    "iti.started", "iti.stopped",
+    "choice_mouse.clicked_name", "choice_mouse.clicked_side", "choice_mouse.rt", "choice_mouse.started",
+    "Trial_Number", "Choice_String", "Chose_Gamble_Binary", "Attention_Check_Correct", "ReactionTime_ms",
+    "participant", "session", "date", "expName", "expStart", "frameRate", "debug",
+  ];
+
+  function csvCell(v) {
+    let s = String(v ?? "");
+    // The participant ID is free text: keep a spreadsheet from reading one as a formula.
+    if (/^[=+\-@]/.test(s) && isNaN(Number(s))) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function safeId() { return participantId.replace(/[^A-Za-z0-9_-]+/g, "_") || "participant"; }
+
+  function csvText() {
+    const lines = [CSV_HEADER.join(",")]
+      .concat(rows.map((r) => CSV_HEADER.map((h) => csvCell({ ...r, ...expInfo }[h])).join(",")));
+    return lines.join("\r\n") + "\r\n";
+  }
+
+  function downloadCSV() {
+    const blob = new Blob([csvText()], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    // PsychoPy file name: <participant>_<expName>_<date>.csv
+    a.download = safeId() + "_" + EXP_NAME + "_" + (DEBUG ? "DEBUG_" : "") + expInfo.date + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return a.download;
+  }
+
+  // ======================= Flow =======================
+  async function runExperiment() {
+    window.addEventListener("beforeunload", beforeUnload);
+    t0 = performance.now();
+    const startDate = new Date();
+    rows = [];
+    expInfo = {
+      participant: participantId,
+      session: "001",
+      date: psychopyDate(startDate),
+      expName: EXP_NAME,
+      expStart: startDate.toISOString(),
+      frameRate: "",
+      debug: DEBUG ? 1 : 0,
+    };
+
+    $("n-trials").textContent = CONDITIONS.length;
+    show("s-instr");
+    // Measure the refresh rate while the instructions are on screen.
+    const fps = measureFrameRate().then((r) => { expInfo.frameRate = Math.round(r * 100) / 100; });
+    await waitForClick($("btn-begin"));
+    await fps;
+
+    await runTrials();
+
+    finished = true;
+    window.removeEventListener("beforeunload", beforeUnload);
+    showResults();
+    // Save the data automatically; the button stays as a backup.
+    const name = downloadCSV();
+    $("dl-msg").textContent = "Your data was downloaded automatically as " + name +
+      ". If you can't find it, click the button to download it again.";
+  }
+
+  function tryStart() {
+    const v = $("pid").value.trim();
+    if (started) return;
+    if (!v) { $("pid-err").textContent = "Please enter your ID."; $("pid").focus(); return; }
+    started = true;
+    participantId = v;
+    $("btn-start").disabled = true;
+    runExperiment();
+  }
+
+  $("btn-start").addEventListener("click", tryStart);
+  $("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+  $("btn-download").addEventListener("click", () => {
+    if (finished) $("dl-msg").textContent = "Downloaded " + downloadCSV();
+  });
+  if (DEBUG) $("debug-badge").hidden = false;
+  $("pid").value = randomParticipantId();
+  $("pid").focus();
+  $("pid").select();
+
+  // Test hook (debug only): lets an automated run read the rows and the CSV text.
+  if (DEBUG) window.__lab = { rows: () => rows, header: CSV_HEADER, info: () => expInfo, csv: csvText, conditions: CONDITIONS };
+})();
+</script>
+</body>
+</html>
