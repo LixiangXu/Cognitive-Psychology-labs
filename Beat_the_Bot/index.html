@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beat the bot: rock, paper, scissors</title>
+  <style>
+    :root { color-scheme: light; font-family: sans-serif; }
+    body { margin: 0; background: transparent; color: #334155; text-align: center; }
+    .wrap { box-sizing: border-box; max-width: 720px; height: 460px; margin: 0 auto; padding: 10px 14px;
+            background: #ffffff; border: 2px solid #cbd5e1; border-radius: 12px; display: flex; flex-direction: column; }
+    .bar { display: flex; justify-content: space-between; font-weight: 700; font-size: 1rem; color: #1e293b; }
+    .bar .you { color: #0369a1; } .bar .bot { color: #be123c; }
+    .table { display: flex; justify-content: center; align-items: center; gap: 26px; margin-top: 8px; }
+    .seat { flex: 1; max-width: 150px; }
+    .seat .who { font-weight: 800; font-size: 0.95rem; }
+    .seat .hand { font-size: 3.4rem; line-height: 4.2rem; height: 4.2rem; }
+    .seat.you .who { color: #0369a1; } .seat.bot .who { color: #be123c; }
+    .verdict { flex: 1.2; max-width: 170px; font-weight: 800; font-size: 1.05rem; color: #1e293b; min-height: 2.6rem; }
+    .lock { font-size: 0.82rem; color: #64748b; min-height: 1.1rem; }
+    .moves { display: flex; justify-content: center; gap: 14px; margin-top: 6px; }
+    .moves button { flex: 1; max-width: 132px; padding: 8px 0; border: 2px solid #0ea5e9; border-radius: 12px; background: #e0f2fe;
+                    color: #0369a1; font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; }
+    .moves button span { display: block; font-size: 1.7rem; line-height: 2rem; }
+    .moves button:active { background: #bae6fd; }
+    svg { display: block; width: 100%; height: auto; max-height: 128px; margin-top: 6px; }
+    h1.solo { display: none; margin: 0 0 8px; font-size: 1.3rem; color: #1e293b; }
+    /* opened on its own (a phone, the labs site): fill the screen and enlarge the controls */
+    .standalone body { background: #f8fafc; }
+    .standalone .wrap { height: auto; min-height: 100vh; max-width: 560px; border: 0; border-radius: 0; padding: 16px 12px; background: #f8fafc; }
+    .standalone h1.solo { display: block; }
+    .standalone .table { gap: 10px; margin-top: 12px; }
+    .standalone .moves { margin-top: 12px; gap: 10px; }
+    .standalone .moves button { padding: 16px 0; font-size: 1.05rem; }
+    .standalone .lock, .standalone .stat { margin-top: 8px; }
+    .standalone .controls button { margin-top: 12px; padding: 0.5rem 1rem; }
+    .stat { font-size: 0.92rem; font-weight: 700; color: #1e293b; min-height: 1.2rem; }
+    .controls button { margin-top: 4px; padding: 0.3rem 0.8rem; border: 1px solid #64748b; border-radius: 5px;
+                    background: #ffffff; color: #334155; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="solo">&#129302; Beat the Bot</h1>
+    <div class="bar"><span id="round">Round 1</span><span><span class="you" id="sYou">You 0</span> &#183; <span class="bot" id="sBot">Bot 0</span> &#183; <span id="sTie">Ties 0</span></span></div>
+    <div class="table">
+      <div class="seat you"><div class="who">You</div><div class="hand" id="hYou">&#10067;</div></div>
+      <div class="verdict" id="verdict">Pick a move.</div>
+      <div class="seat bot"><div class="who">Bot</div><div class="hand" id="hBot">&#128274;</div></div>
+    </div>
+    <div class="lock" id="lock">&#128274; The bot has already locked its move for this round.</div>
+    <div class="moves">
+      <button type="button" data-move="0" aria-label="Rock"><span>&#9994;</span>Rock</button>
+      <button type="button" data-move="1" aria-label="Paper"><span>&#9995;</span>Paper</button>
+      <button type="button" data-move="2" aria-label="Scissors"><span>&#9996;&#65039;</span>Scissors</button>
+    </div>
+    <svg id="chart" viewBox="0 0 680 128" role="img" aria-label="Running lead: the bot's wins minus your wins after each round"></svg>
+    <div class="stat" id="stat">The bot starts out guessing at random. It learns only from the moves you have already played.</div>
+    <div class="controls"><button type="button" id="reset">&#8635; New match</button></div>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+      if (window.self === window.top) document.documentElement.classList.add('standalone');
+      const palette = { you: '#0369a1', bot: '#be123c', axis: '#94a3b8', text: '#475569' };
+      const HANDS = ['✊', '✋', '✌️'];
+      const $ = (id) => document.getElementById(id);
+      const rand3 = () => Math.floor(Math.random() * 3);
+      const beats = (m) => (m + 1) % 3;                 // the move that beats m
+      let you, bot, outcomes, scores, tables, botMove, guesses, hits, lead;
+
+      // Each predictor guesses the player's next move from a different piece of the past.
+      const CONTEXTS = [
+        () => 'all',                                                              // overall favorite move
+        (n) => n > 0 ? 'p' + you[n - 1] : null,                                   // after your last move
+        (n) => n > 1 ? 'pp' + you[n - 2] + you[n - 1] : null,                     // after your last two moves
+        (n) => n > 0 ? 'o' + outcomes[n - 1] + you[n - 1] : null,                 // after a win, loss or tie with that move
+        (n) => n > 0 ? 'b' + bot[n - 1] + you[n - 1] : null                       // after the last pair of moves
+      ];
+
+      function predict(i, n) {
+        const key = CONTEXTS[i](n);
+        const row = key && tables[i][key];
+        if (!row) return null;
+        const max = Math.max(row[0], row[1], row[2]);
+        if (max === 0) return null;
+        const best = [0, 1, 2].filter((m) => row[m] === max);
+        return best[Math.floor(Math.random() * best.length)];
+      }
+
+      function lockBot() {             // called BEFORE the player moves; uses past rounds only
+        const n = you.length;
+        let bestI = -1, bestScore = 0.36;                // must beat chance (1/3) to be trusted
+        CONTEXTS.forEach((_, i) => { if (scores[i].n >= 3 && scores[i].s / scores[i].n > bestScore && predict(i, n) !== null) { bestScore = scores[i].s / scores[i].n; bestI = i; } });
+        const guess = bestI >= 0 ? predict(bestI, n) : null;
+        botMove = { move: guess === null ? rand3() : beats(guess), guess };
+      }
+
+      function play(m) {
+        const n = you.length, b = botMove.move;
+        // score every predictor on this round, then let it learn the round
+        CONTEXTS.forEach((_, i) => {
+          const g = predict(i, n);
+          if (g !== null) { scores[i].n = scores[i].n * 0.9 + 1; scores[i].s = scores[i].s * 0.9 + (g === m ? 1 : 0); }
+          const key = CONTEXTS[i](n);
+          if (key) { (tables[i][key] = tables[i][key] || [0, 0, 0])[m] += 1; }
+        });
+        if (botMove.guess !== null) { guesses += 1; if (botMove.guess === m) hits += 1; }
+        const result = m === b ? 'tie' : (beats(b) === m ? 'you' : 'bot');
+        you.push(m); bot.push(b); outcomes.push(result === 'you' ? 'w' : result === 'bot' ? 'l' : 't');
+        lead.push(lead[lead.length - 1] + (result === 'bot' ? 1 : result === 'you' ? -1 : 0));
+        $('hYou').textContent = HANDS[m]; $('hBot').textContent = HANDS[b];
+        $('verdict').textContent = result === 'tie' ? 'Tie.' : result === 'you' ? 'You win this round.' : 'The bot wins this round.';
+        $('verdict').style.color = result === 'tie' ? '#1e293b' : palette[result];
+        lockBot(); draw();
+      }
+
+      function el(name, attrs, text) {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', name);
+        Object.keys(attrs).forEach((k) => node.setAttribute(k, attrs[k]));
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function draw() {
+        const n = you.length;
+        const w = outcomes.filter((o) => o === 'w').length, l = outcomes.filter((o) => o === 'l').length;
+        $('round').textContent = 'Round ' + (n + 1);
+        $('sYou').textContent = 'You ' + w; $('sBot').textContent = 'Bot ' + l; $('sTie').textContent = 'Ties ' + (n - w - l);
+        if (n > 0) {
+          let s = w + l > 0 ? 'Bot has won ' + Math.round(100 * l / (w + l)) + '% of the rounds that did not tie.' : '';
+          if (guesses >= 5) s += ' It guessed your move on ' + Math.round(100 * hits / guesses) + '% of its predictions (chance: 33%).';
+          $('stat').textContent = s;
+        }
+        const svg = $('chart'); svg.innerHTML = '';
+        const x0 = 46, x1 = 668, y0 = 10, y1 = 104, span = Math.max(30, n);
+        const top = Math.max(5, Math.max.apply(null, lead.map(Math.abs)));
+        const X = (t) => x0 + (x1 - x0) * t / span, Y = (v) => (y0 + y1) / 2 - (y1 - y0) / 2 * v / top;
+        svg.appendChild(el('line', { x1: x0, y1: Y(0), x2: x1, y2: Y(0), stroke: palette.axis, 'stroke-width': 1.5 }));
+        svg.appendChild(el('line', { x1: x0, y1: y0, x2: x0, y2: y1, stroke: palette.axis, 'stroke-width': 1.5 }));
+        svg.appendChild(el('text', { x: x0 + 6, y: y0 + 10, 'font-size': 12, 'font-weight': 700, fill: palette.bot }, 'bot ahead'));
+        svg.appendChild(el('text', { x: x0 + 6, y: y1 - 2, 'font-size': 12, 'font-weight': 700, fill: palette.you }, 'you ahead'));
+        svg.appendChild(el('text', { x: x0 - 6, y: Y(top) + 4, 'text-anchor': 'end', 'font-size': 11, fill: palette.text }, '+' + top));
+        svg.appendChild(el('text', { x: x0 - 6, y: Y(0) + 4, 'text-anchor': 'end', 'font-size': 11, fill: palette.text }, '0'));
+        svg.appendChild(el('text', { x: x0 - 6, y: Y(-top) + 4, 'text-anchor': 'end', 'font-size': 11, fill: palette.text }, '-' + top));
+        svg.appendChild(el('text', { x: (x0 + x1) / 2, y: 124, 'text-anchor': 'middle', 'font-size': 12, fill: palette.text }, 'round  (line = bot wins minus your wins)'));
+        if (n > 0) {
+          const d = lead.map((v, t) => (t ? 'L' : 'M') + X(t).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ');
+          svg.appendChild(el('path', { d, fill: 'none', stroke: lead[n] >= 0 ? palette.bot : palette.you, 'stroke-width': 3 }));
+        }
+      }
+
+      function reset() {
+        you = []; bot = []; outcomes = []; lead = [0]; guesses = 0; hits = 0;
+        scores = CONTEXTS.map(() => ({ n: 0, s: 0 })); tables = CONTEXTS.map(() => ({}));
+        $('hYou').textContent = '❓'; $('hBot').textContent = '🔒';
+        $('verdict').textContent = 'Pick a move.'; $('verdict').style.color = '#1e293b';
+        $('stat').textContent = 'The bot starts out guessing at random. It learns only from the moves you have already played.';
+        lockBot(); draw();
+      }
+
+      document.querySelectorAll('.moves button').forEach((b) => b.addEventListener('click', () => play(Number(b.dataset.move))));
+      document.addEventListener('keydown', (e) => { if (e.key === '1' || e.key === '2' || e.key === '3') play(Number(e.key) - 1); });
+      $('reset').addEventListener('click', reset);
+      reset();
+    })();
+  </script>
+</body>
+</html>
