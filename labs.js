@@ -381,13 +381,16 @@ window.LABS = [
     about: [
       "Type a name, abbreviation or alias (insula, PFC, V1, cerebellum) to colour and label a region. Click the brain or a slice to move the crosshair, and use the cut buttons to open the surface along a plane.",
       "A link can open a ready-made map: add the regions to the address, for example TeachingTools/Brain3D/index.html?regions=pfc,v1&view=left.",
+      "Six large-scale networks are built in: visual, somatomotor, dorsal attention, executive control, salience and default mode. Search for 'network', or open them all with ?regions=ECN,VIS,SMN,DAN,SN,DMN. Each is drawn as the atlas gyri that best cover its core regions, so the borders are approximate.",
       "Regions come from the CerebrA atlas on the MNI ICBM152 template. Functional names such as PFC or V1 are shown as the nearest atlas gyri and are marked (approx.). The periaqueductal gray is a hand-placed approximation. The surfaces are deliberately coarse; this is a teaching aid, not a clinical atlas."
     ],
     references: [
       { cite: "Manera, A. L., Dadar, M., Fonov, V., & Collins, D. L. (2020). CerebrA, registration and manual label correction of Mindboggle-101 atlas for MNI-ICBM152 template. *Scientific Data, 7*, 237.",
         doi: "10.1038/s41597-020-0557-9" },
       { cite: "Fonov, V., Evans, A. C., Botteron, K., Almli, C. R., McKinstry, R. C., & Collins, D. L. (2011). Unbiased average age-appropriate atlases for pediatric studies. *NeuroImage, 54*(1), 313–327.",
-        doi: "10.1016/j.neuroimage.2010.07.033" }
+        doi: "10.1016/j.neuroimage.2010.07.033" },
+      { cite: "Uddin, L. Q., Yeo, B. T. T., & Spreng, R. N. (2019). Towards a universal taxonomy of macro-scale functional human brain networks. *Brain Topography, 32*(6), 926–942.",
+        doi: "10.1007/s10548-019-00744-6" }
     ],
     chapter: "Goldstein, Ch. 2",
     analysis: ""
