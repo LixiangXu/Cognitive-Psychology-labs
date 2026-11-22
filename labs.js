@@ -21,9 +21,11 @@
      number      Lab number shown on the badge (0, 1, 2 ...). Leave out for
                  in-class demos.
      title       Name shown on the card.
-     type        "lab" (default) or "demo" (in-class demo / game).
+     type        "lab" (default), "demo" (in-class demo / game) or
+                 "tool" (teaching tool, e.g. the 3D brain viewer).
      folder      Folder that holds the experiment. The card links to
                  <folder>/index.html. Must match the folder name exactly.
+                 Tools live in TeachingTools/, e.g. "TeachingTools/Brain3D".
      cover       Path to the cover image, e.g. "covers/lab5.jpg".
      tags        ["Tag one", "Tag two"]. Just type a new tag here and it
                  shows up in the filter bar automatically. Spelling and
@@ -365,6 +367,29 @@ window.LABS = [
         doi: "10.1038/srep05830" }
     ],
     chapter: "Goldstein, Ch. 13",
+    analysis: ""
+  },
+
+  {
+    id: "brain3d",
+    title: "3D Brain Viewer",
+    type: "tool",
+    folder: "TeachingTools/Brain3D",
+    cover: "covers/brain3d.jpg",
+    tags: ["Brain anatomy"],
+    summary: "Rotate a see-through brain, cut it along any plane, and search for a region by name to highlight it in 3D and on three slice views.",
+    about: [
+      "Type a name, abbreviation or alias (insula, PFC, V1, cerebellum) to colour and label a region. Click the brain or a slice to move the crosshair, and use the cut buttons to open the surface along a plane.",
+      "A link can open a ready-made map: add the regions to the address, for example TeachingTools/Brain3D/index.html?regions=pfc,v1&view=left.",
+      "Regions come from the CerebrA atlas on the MNI ICBM152 template. Functional names such as PFC or V1 are shown as the nearest atlas gyri and are marked (approx.). The periaqueductal gray is a hand-placed approximation. The surfaces are deliberately coarse; this is a teaching aid, not a clinical atlas."
+    ],
+    references: [
+      { cite: "Manera, A. L., Dadar, M., Fonov, V., & Collins, D. L. (2020). CerebrA, registration and manual label correction of Mindboggle-101 atlas for MNI-ICBM152 template. *Scientific Data, 7*, 237.",
+        doi: "10.1038/s41597-020-0557-9" },
+      { cite: "Fonov, V., Evans, A. C., Botteron, K., Almli, C. R., McKinstry, R. C., & Collins, D. L. (2011). Unbiased average age-appropriate atlases for pediatric studies. *NeuroImage, 54*(1), 313–327.",
+        doi: "10.1016/j.neuroimage.2010.07.033" }
+    ],
+    chapter: "Goldstein, Ch. 2",
     analysis: ""
   }
 

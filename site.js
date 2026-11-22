@@ -31,7 +31,10 @@
   function $(id) { return document.getElementById(id); }
   function list(x) { return x == null || x === "" ? [] : (Array.isArray(x) ? x : [x]); }
   function isDemo(lab) { return lab.type === "demo"; }
+  function isTool(lab) { return lab.type === "tool"; }
+  function typeOf(lab) { return isTool(lab) ? "tool" : isDemo(lab) ? "demo" : "lab"; }
   function badgeText(lab) {
+    if (isTool(lab)) return "Teaching tool";
     if (isDemo(lab)) return "In-class demo";
     return lab.number == null ? "Lab" : "Lab " + lab.number;
   }
@@ -91,6 +94,7 @@
 
   // Data-analysis link(s): a live button per link, or a greyed-out "coming soon".
   function analysisNodes(lab, cls) {
+    if (isTool(lab)) return null;                     // a tool collects no data
     var links = list(lab.analysis).map(function (a) {
       return typeof a === "string" ? { label: "", url: a } : a;
     }).filter(function (a) { return a && a.url; });
@@ -135,7 +139,7 @@
       list(lab.references).forEach(function (r, j) {
         if (!r || !r.cite) problems.push(name + ": reference " + (j + 1) + " has no “cite” text.");
       });
-      if (lab.type && lab.type !== "lab" && lab.type !== "demo") problems.push(name + ": “type” must be \"lab\" or \"demo\".");
+      if (lab.type && ["lab", "demo", "tool"].indexOf(lab.type) < 0) problems.push(name + ": “type” must be \"lab\", \"demo\" or \"tool\".");
     });
     return problems;
   }
@@ -206,7 +210,7 @@
     var state = {
       q: params.get("q") || "",
       tags: (params.get("tag") || "").split(",").map(function (s) { return s.trim(); }).filter(function (t) { return tagCount[t]; }),
-      type: ["lab", "demo"].indexOf(params.get("type")) >= 0 ? params.get("type") : "all",
+      type: ["lab", "demo", "tool"].indexOf(params.get("type")) >= 0 ? params.get("type") : "all",
       sort: params.get("sort") === "az" ? "az" : "course"
     };
 
@@ -228,7 +232,7 @@
       return lab._hay;
     }
     function matches(lab) {
-      if (state.type !== "all" && (isDemo(lab) ? "demo" : "lab") !== state.type) return false;
+      if (state.type !== "all" && typeOf(lab) !== state.type) return false;
       if (state.tags.length && !state.tags.some(function (t) { return list(lab.tags).indexOf(t) >= 0; })) return false;
       var words = state.q.toLowerCase().split(/\s+/).filter(Boolean);
       var hay = haystack(lab);
@@ -236,8 +240,8 @@
     }
 
     function card(lab) {
-      var noun = isDemo(lab) ? "demo" : "lab";
-      return h("article", { class: "card" + (isDemo(lab) ? " is-demo" : "") },
+      var noun = typeOf(lab);
+      return h("article", { class: "card" + (isDemo(lab) ? " is-demo" : "") + (isTool(lab) ? " is-tool" : "") },
         h("div", { class: "card-top" }, coverNode(lab), h("span", { class: "badge" }, badgeText(lab))),
         h("div", { class: "card-body" },
           h("h2", null, h("a", { class: "card-link", href: launchUrl(lab) }, lab.title)),
@@ -245,7 +249,7 @@
           tagChips(lab, false),
           metaLine(lab),
           h("div", { class: "card-actions" },
-            h("span", { class: "go", "aria-hidden": "true" }, "Launch " + noun + " →"),
+            h("span", { class: "go", "aria-hidden": "true" }, (isTool(lab) ? "Open " : "Launch ") + noun + " →"),
             h("a", { class: "sub-link", href: detailsUrl(lab), "aria-label": "Details: " + lab.title }, "Details"),
             analysisNodes(lab, "sub-link")),
           instructorNodes(lab)));
@@ -363,7 +367,7 @@
       return;
     }
     var lab = labs[idx];
-    var noun = isDemo(lab) ? "demo" : "experiment";
+    var noun = isTool(lab) ? "tool" : isDemo(lab) ? "demo" : "experiment";
     document.title = lab.title + " · " + (SITE.title || "Labs");
 
     var refs = list(lab.references).filter(function (r) { return r && r.cite; });
@@ -378,14 +382,14 @@
         tagChips(lab, true),
         metaLine(lab),
         h("div", { class: "detail-actions" },
-          h("a", { class: "btn btn-primary", href: launchUrl(lab) }, "Start " + noun + " →"),
+          h("a", { class: "btn btn-primary", href: launchUrl(lab) }, (isTool(lab) ? "Open " : "Start ") + noun + " →"),
           analysisNodes(lab, "btn btn-secondary")),
         instructorNodes(lab))));
 
     if (about.length || refs.length) {
       main.appendChild(h("details", { class: "about" },
         h("summary", null, "About this " + noun,
-          isDemo(lab) ? null : h("span", { class: "about-hint" }, "Best read after you have taken part")),
+          isDemo(lab) || isTool(lab) ? null : h("span", { class: "about-hint" }, "Best read after you have taken part")),
         h("div", { class: "about-body" },
           about.map(function (p) { return h("p", null, p); }),
           refs.length ? [

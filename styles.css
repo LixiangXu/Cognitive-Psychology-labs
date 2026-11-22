@@ -188,6 +188,7 @@ a { color: var(--gold-text); }
   padding: 0.24rem 0.6rem; border-radius: 5px;
 }
 .is-demo .badge { background: var(--gold); color: #17130a; border-bottom-color: var(--black); }
+.is-tool .badge { background: #fff; color: #17130a; border-bottom-color: var(--gold); }
 
 .card-body { display: flex; flex-direction: column; flex: 1; padding: 1.1rem 1.2rem 1.15rem; }
 .card h2 { margin: 0 0 0.4rem; font-family: var(--serif); font-size: 1.28rem; font-weight: 600; line-height: 1.22; }
