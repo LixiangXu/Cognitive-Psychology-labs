@@ -1,0 +1,4 @@
+block_type,words_file
+neutral,neutral_words.csv
+negative,negative_words.csv
+positive,positive_words.csv

@@ -309,6 +309,32 @@ window.LABS = [
     conditions: ["conditions.csv"]
   },
 
+  {
+    id: "lab10",
+    number: 10,
+    title: "Emotional Stroop",
+    type: "lab",
+    folder: "Lab10_EmotionalStroop",
+    cover: "covers/lab10.jpg",
+    tags: ["Attention", "Emotion"],
+    duration: "5 min",
+    summary: "Name the ink color of each word as quickly as you can, using four keys. A short practice, then three blocks of 24 words.",
+    about: [
+      "Each word is printed in red, blue, green or yellow, and you press the key for the ink color while ignoring what the word says. One block uses neutral words (CHAIR, WINDOW), one uses negative words (DANGER, PANIC) and one uses positive words (HAPPY, VICTORY); the order of the blocks is random for each person.",
+      "Unlike the classic Stroop task, the words never name a color, so nothing in the word conflicts with the answer. If color naming is still slower for emotional words, their meaning must have drawn attention away from the task. The emotional interference score is the mean reaction time for negative words minus the mean for neutral words."
+    ],
+    references: [
+      { cite: "Pratto, F., & John, O. P. (1991). Automatic vigilance: The attention-grabbing power of negative social information. *Journal of Personality and Social Psychology, 61*(3), 380–391.",
+        doi: "10.1037/0022-3514.61.3.380" },
+      { cite: "Williams, J. M. G., Mathews, A., & MacLeod, C. (1996). The emotional Stroop task and psychopathology. *Psychological Bulletin, 120*(1), 3–24.",
+        doi: "10.1037/0033-2909.120.1.3" }
+    ],
+    chapter: "Smith & Kosslyn, Ch. 8",
+    analysis: "",
+    debug: true,
+    conditions: ["practice_conditions.csv", "block_conditions.csv", "neutral_words.csv", "negative_words.csv", "positive_words.csv"]
+  },
+
   /* ---------- In-class demos and games (no lab number) ---------- */
 
   {

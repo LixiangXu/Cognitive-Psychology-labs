@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 10: Emotional Stroop</title>
+<style>
+  :root {
+    --bg: #808080;        /* PsychoPy default gray */
+    --fg: #FFFFFF;
+    --muted: #D3D3D3;
+    /* Ink colors (also used for the key legend) */
+    --red: #FF3B30;
+    --blue: #3399FF;
+    --green: #34C759;
+    --yellow: #FFD60A;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--fg);
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Each screen fills the window; long screens (instructions, results) can scroll. */
+  .screen { position: fixed; inset: 0; display: none; overflow: auto; padding: 24px 16px 96px; text-align: center; }
+  .screen.active { display: flex; }
+  .screen > .inner { margin: auto; width: 100%; max-width: 860px; }
+  h1 { font-size: 32px; font-weight: normal; margin: 0 0 24px; }
+  p, li { font-size: 22px; line-height: 1.5; }
+  .instr { text-align: left; max-width: 760px; margin: 0 auto; }
+  kbd {
+    display: inline-block; min-width: 28px; padding: 1px 8px; margin: 0 2px;
+    font-family: inherit; font-size: 20px; text-align: center;
+    border: 1.5px solid var(--fg); border-radius: 4px;
+  }
+  .press { font-size: 22px; margin-top: 30px; min-height: 30px; }
+
+  /* Key map on the instruction screen: four key caps with their ink colors */
+  .keymap { display: flex; justify-content: center; gap: 14px; margin: 22px 0; flex-wrap: wrap; }
+  .keymap .key { width: 96px; text-align: center; font-size: 17px; }
+  .keymap .cap {
+    display: block; width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 8px;
+    font-size: 30px; font-weight: bold; line-height: 64px; color: #1E1E1E;
+  }
+
+  /* Corner labels */
+  #debug-badge {
+    position: fixed; top: 8px; left: 8px; z-index: 30; padding: 2px 8px; font-size: 13px;
+    border: 1px solid var(--fg); border-radius: 3px; opacity: 0.8;
+  }
+  #progress {
+    position: fixed; top: 10px; right: 14px; z-index: 30;
+    font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+
+  /* Key legend, always at the bottom of the screen during the task */
+  #legend {
+    position: fixed; left: 0; right: 0; bottom: 22px; z-index: 30;
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 44px;
+    font-size: 26px; color: var(--muted); white-space: nowrap;
+  }
+  #legend[hidden] { display: none; }
+  #legend i { display: inline-block; width: 20px; height: 20px; margin-right: 9px; border-radius: 3px; vertical-align: -2px; }
+
+  /* Start dialog (PsychoPy-style white card) */
+  .dialog {
+    margin: auto; width: 100%; max-width: 440px; text-align: left;
+    background: #FFFFFF; color: #222222; border: 1px solid #B5B5B5; border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  }
+  .dialog .titlebar {
+    padding: 10px 20px; font-size: 15px; color: #444444;
+    background: #F1F1F1; border-bottom: 1px solid #D0D0D0; border-radius: 6px 6px 0 0;
+  }
+  .dialog .body { padding: 18px 20px 20px; }
+  .dialog label { display: block; font-size: 15px; margin: 0 0 5px; color: #222222; }
+  .dialog input[type=text] {
+    width: 100%; padding: 8px 10px; font: inherit; font-size: 17px; color: #111111;
+    background: #FFFFFF; border: 1px solid #9A9A9A; border-radius: 3px; outline: none;
+  }
+  .dialog input[type=text]:focus { border-color: #3A6EA5; box-shadow: 0 0 0 2px rgba(58, 110, 165, 0.25); }
+  .dialog .hint { font-size: 13px; line-height: 1.4; color: #666666; margin: 5px 0 16px; }
+  .dialog .error { min-height: 18px; font-size: 13px; color: #B00020; margin: 8px 0 0; }
+  .dialog .buttons { display: flex; justify-content: space-between; margin-top: 8px; }
+  .dialog button { font: inherit; font-size: 15px; padding: 8px 22px; cursor: pointer; border-radius: 4px; }
+  #btn-start { color: #FFFFFF; background: #3A6EA5; border: 1px solid #2F5A88; padding: 8px 30px; }
+  #btn-start:hover { background: #2F5A88; }
+  #btn-fullscreen { color: #333333; background: #FFFFFF; border: 1px solid #9A9A9A; }
+  #btn-fullscreen:hover { background: #F1F1F1; }
+
+  /* Trial screen: fixation, word and feedback share one centred slot */
+  #s-trial { padding: 0; overflow: hidden; }
+  #stage { position: absolute; inset: 0; display: grid; place-items: center; }
+  #stage > * { grid-area: 1 / 1; visibility: hidden; }
+  #stage > .on { visibility: visible; }
+  #fix { font-size: 84px; line-height: 1; }
+  #word { font-size: min(112px, 12.5vw); font-weight: bold; line-height: 1; text-transform: uppercase; letter-spacing: 0.02em; }
+  #feedback { font-size: min(44px, 5vw); padding: 0 20px; }
+
+  /* Results */
+  table { margin: 0 auto; border-collapse: collapse; font-size: 20px; }
+  th, td { padding: 10px 22px; border-bottom: 1px solid rgba(255, 255, 255, 0.35); }
+  th { font-weight: normal; color: var(--muted); }
+  td.lbl, th.lbl { text-align: left; }
+  td.num { text-align: right; font-size: 26px; font-variant-numeric: tabular-nums; }
+  #score { font-size: 22px; margin: 26px auto 0; }
+  #score b { font-size: 30px; font-variant-numeric: tabular-nums; }
+  .note { font-size: 16px; line-height: 1.5; color: var(--muted); max-width: 700px; margin: 12px auto 0; }
+  #btn-download {
+    font: inherit; font-size: 22px; font-weight: bold; padding: 14px 40px; margin-top: 26px;
+    background: var(--fg); color: #4A4A4A; border: 2px solid var(--fg); border-radius: 4px; cursor: pointer;
+  }
+  #btn-download:hover { background: var(--muted); }
+  #dl-msg { font-size: 16px; color: var(--muted); min-height: 22px; margin-top: 10px; word-break: break-word; }
+
+  @media (max-width: 640px) {
+    #legend { font-size: 17px; gap: 4px 18px; }
+    table { font-size: 16px; }
+    th, td { padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+<div id="debug-badge" hidden>DEBUG MODE</div>
+<div id="progress"></div>
+<div id="legend" hidden></div>
+
+<!-- Start dialog -->
+<div id="s-dialog" class="screen active">
+  <div class="dialog" role="dialog" aria-labelledby="dlg-title">
+    <div class="titlebar" id="dlg-title">Lab 10: Color Naming Task</div>
+    <div class="body">
+      <label for="pid">Participant ID</label>
+      <input type="text" id="pid" autocomplete="off" spellcheck="false">
+      <p class="hint" style="margin-bottom: 0">A random ID has been filled in. Keep it, or type your own.</p>
+      <div class="error" id="pid-err"></div>
+      <div class="buttons">
+        <button type="button" id="btn-fullscreen">Fullscreen</button>
+        <button type="button" id="btn-start">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Instruction and rest screens (text is filled in from the script) -->
+<div id="s-instr" class="screen">
+  <div class="inner">
+    <h1 id="instr-title"></h1>
+    <div class="instr" id="instr-body"></div>
+    <p class="press" id="instr-press"></p>
+  </div>
+</div>
+
+<!-- Trial screen -->
+<div id="s-trial" class="screen">
+  <div id="stage">
+    <div id="fix">+</div>
+    <div id="word"></div>
+    <div id="feedback"></div>
+  </div>
+</div>
+
+<!-- Results -->
+<div id="s-end" class="screen">
+  <div class="inner">
+    <h1>Your Results</h1>
+    <table>
+      <thead>
+        <tr><th class="lbl">Word type</th><th>Mean reaction time</th><th>Accuracy</th></tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+    <p id="score"></p>
+    <p class="note" id="score-note"></p>
+    <p class="note">Reaction times are averaged over correct trials only. The emotional interference score is your mean reaction time for negative words minus your mean reaction time for neutral words.</p>
+    <button id="btn-download">Download Data (CSV)</button>
+    <div id="dl-msg"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // =====================================================================================
+  // STIMULI
+  // =====================================================================================
+  // Ink colors and their response keys: the first letter of each color name.
+  const COLORS = [
+    { name: "red",    label: "Red",    key: "r", css: "var(--red)" },
+    { name: "blue",   label: "Blue",   key: "b", css: "var(--blue)" },
+    { name: "green",  label: "Green",  key: "g", css: "var(--green)" },
+    { name: "yellow", label: "Yellow", key: "y", css: "var(--yellow)" },
+  ];
+  const COLOR = Object.fromEntries(COLORS.map((c) => [c.name, c]));
+  const KEYS = COLORS.map((c) => c.key);
+
+  // One block per word list (block_conditions.csv). Each block shows its 12 words twice.
+  const BLOCKS = [
+    { block_type: "neutral",  words_file: "neutral_words.csv",
+      words: ["CHAIR", "TABLE", "PENCIL", "WINDOW", "BASKET", "CLOCK", "CARPET", "GARDEN", "BUTTON", "MIRROR", "BOTTLE", "HAMMER"] },
+    { block_type: "negative", words_file: "negative_words.csv",
+      words: ["PANIC", "CANCER", "DEATH", "TERROR", "FAILURE", "DANGER", "MURDER", "POISON", "TRAUMA", "GUILTY", "AFRAID", "CORPSE"] },
+    { block_type: "positive", words_file: "positive_words.csv",
+      words: ["TRIUMPH", "HAPPY", "MIRACLE", "SUCCESS", "VICTORY", "PLEASURE", "PARADISE", "DELIGHT", "JOYFUL", "BRILLIANT", "WONDER", "LOVELY"] },
+  ];
+  const N_REPS = 2;   // each word is shown twice per block
+
+  // The 6 possible block orders; each participant gets one at random.
+  const BLOCK_ORDERS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+
+  // Practice: 12 letter strings (practice_conditions.csv); every ink color appears 3 times.
+  const PRACTICE = [
+    ["XXXXX", "red"],    ["XXXXX", "blue"],   ["XXXXX", "green"],
+    ["ZZZZZ", "blue"],   ["ZZZZZ", "green"],  ["ZZZZZ", "yellow"],
+    ["MMMMM", "green"],  ["MMMMM", "yellow"], ["MMMMM", "red"],
+    ["TTTTT", "yellow"], ["TTTTT", "red"],    ["TTTTT", "blue"],
+  ];
+
+  // =====================================================================================
+  // PARAMETERS
+  // =====================================================================================
+  // Timing (ms). Add ?debug=1 to the URL for a fast run-through.
+  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+  const FIX_MS      = DEBUG ? 100 : 500;     // fixation cross
+  const TIMEOUT_MS  = 2500;                  // response window (not shortened in debug mode)
+  const ITI_MS      = DEBUG ? 50 : 250;      // blank screen after each trial
+  const FEEDBACK_MS = DEBUG ? 150 : 500;     // practice feedback, and "Too Slow!"
+  const REST_MIN_MS = DEBUG ? 1000 : 10000;  // shortest rest between blocks
+
+  // =====================================================================================
+  // STATE
+  // =====================================================================================
+  const EXP_NAME = "Lab10_EmotionalStroop";
+  let participantId = "";
+  let rows = [];          // one row per trial, practice and experiment (PsychoPy-style long format)
+  let t0 = 0;             // experiment clock zero (performance.now() at Start)
+  let wall0 = 0;          // Date.now() at the same moment, for the timestamp column
+  let frameMs = 1000 / 60;
+  let expInfo = {};
+  let started = false;
+  let finished = false;
+
+  // =====================================================================================
+  // HELPERS
+  // =====================================================================================
+  const $ = (id) => document.getElementById(id);
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
+
+  // Frame-locked screen updates, like win.flip() in PsychoPy: fn() runs in the animation
+  // frame and the frame's timestamp is returned as the onset/offset time.
+  const flip = (fn) => new Promise((r) => requestAnimationFrame((t) => { if (fn) fn(); r(t); }));
+
+  // Like flip(), but waits for the first frame at or after targetT (within half a frame).
+  function flipAt(targetT, fn) {
+    return new Promise((r) => {
+      function tick(t) {
+        if (t >= targetT - frameMs / 2) { if (fn) fn(); r(t); } else requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // Estimate the monitor refresh interval from 60 frames.
+  async function measureFrameRate() {
+    const ts = [];
+    for (let i = 0; i < 61; i++) ts.push(await flip());
+    const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b);
+    frameMs = d[Math.floor(d.length / 2)];
+    return 1000 / frameMs;
+  }
+
+  // Seconds on the experiment clock, rounded to 0.1 ms (PsychoPy logs times in seconds).
+  const sec = (t) => Math.round((t - t0) * 10) / 10000;
+  // A duration in seconds, rounded to 0.1 ms.
+  const dur = (ms) => Math.round(ms * 10) / 10000;
+
+  function pad(n, w = 2) { return String(n).padStart(w, "0"); }
+
+  // PsychoPy date format: 2026-10-07_09h54.12.345
+  function psychopyDate(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" +
+      pad(d.getHours()) + "h" + pad(d.getMinutes()) + "." + pad(d.getSeconds()) + "." + pad(d.getMilliseconds(), 3);
+  }
+
+  // Random 6-digit default participant ID, as in PsychoPy Builder.
+  function randomParticipantId() {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+    return pad(n, 6);
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Wait for the first press of an allowed key (held-down repeats are ignored).
+  // Resolves with { key, t }; t is the key event's timestamp, which shares the
+  // performance.now() clock and is closer to the real response than the time the handler runs.
+  // If deadline (a performance.now() time) passes first, resolves with null.
+  function waitForKey(allowed, deadline) {
+    return new Promise((resolve) => {
+      let timer = null;
+      function finish(result) {
+        document.removeEventListener("keydown", onKey);
+        clearTimeout(timer);
+        resolve(result);
+      }
+      function onKey(e) {
+        if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+        const k = (e.key || "").toLowerCase();
+        if (!allowed.includes(k)) return;
+        e.preventDefault();
+        finish({ key: k, t: e.timeStamp > 0 ? e.timeStamp : performance.now() });
+      }
+      document.addEventListener("keydown", onKey);
+      if (deadline !== undefined) timer = setTimeout(() => finish(null), Math.max(0, deadline - performance.now()));
+    });
+  }
+
+  function beforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+
+  const setProgress = (text) => { $("progress").textContent = text; };
+
+  // Show one of "fix", "word", "feedback" in the centre of the screen, or nothing.
+  function showOnly(id) {
+    for (const el of $("stage").children) el.classList.toggle("on", el.id === id);
+  }
+
+  // =====================================================================================
+  // TRIAL LISTS
+  // =====================================================================================
+  // True if no ink color appears more than twice in a row and no word appears twice in a row.
+  function orderOk(trials) {
+    return trials.every((t, i) =>
+      !(i >= 1 && t.word === trials[i - 1].word) &&
+      !(i >= 2 && t.ink === trials[i - 1].ink && t.ink === trials[i - 2].ink));
+  }
+
+  // Practice: the 12 fixed string/color pairs in a random order.
+  function makePracticeTrials() {
+    const all = PRACTICE.map(([word, ink], index) => ({ word, ink, index, rep: 0, trialN: 0 }));
+    for (;;) {
+      const trials = shuffle(all);
+      const noRun = trials.every((t, i) => !(i >= 2 && t.ink === trials[i - 1].ink && t.ink === trials[i - 2].ink));
+      if (noRun) return trials.map((t, n) => ({ ...t, trialN: n }));
+    }
+  }
+
+  // One block: the 12 words in a random order, then all 12 again in a new random order
+  // (like a PsychoPy loop with nReps = 2). Each ink color is used 3 times per repeat, and a
+  // word's second ink color is different from its first.
+  function makeBlockTrials(words) {
+    const perColor = words.length / COLORS.length;
+    for (;;) {
+      const trials = [];
+      const firstInk = {};
+      let ok = true;
+      for (let rep = 0; rep < N_REPS; rep++) {
+        const order = shuffle(words.map((_, i) => i));
+        const inks = shuffle(COLORS.flatMap((c) => Array(perColor).fill(c.name)));
+        order.forEach((index, trialN) => {
+          if (rep === 0) firstInk[index] = inks[trialN];
+          else if (firstInk[index] === inks[trialN]) ok = false;
+          trials.push({ word: words[index], ink: inks[trialN], index, rep, trialN });
+        });
+      }
+      if (ok && orderOk(trials)) return trials;
+    }
+  }
+
+  // =====================================================================================
+  // ONE TRIAL
+  // =====================================================================================
+  // fixation -> colored word until a key press or 2500 ms -> (feedback) -> blank ITI.
+  // Feedback is shown after every practice trial; in the experiment only "Too Slow!" is shown.
+  async function runTrial(t, info) {
+    const c = COLOR[t.ink];
+    const wordEl = $("word"), fbEl = $("feedback");
+    wordEl.textContent = t.word;
+    wordEl.style.color = c.css;
+    setProgress(info.progress);
+
+    const tFix = await flip(() => showOnly("fix"));
+    const tWord = await flipAt(tFix + FIX_MS, () => showOnly("word"));
+    const resp = await waitForKey(KEYS, tWord + TIMEOUT_MS);
+    const correct = resp && resp.key === c.key ? 1 : 0;
+
+    // What follows the word: practice feedback, "Too Slow!", or nothing.
+    let fbText = "", fbColor = "var(--fg)";
+    if (info.phase === "practice") {
+      if (correct) { fbText = "Correct"; fbColor = "var(--green)"; }
+      else {
+        fbText = (resp ? "Incorrect" : "Too Slow!") + " — Press [" + c.key.toUpperCase() + "] for " + c.label;
+        fbColor = "var(--red)";
+      }
+    } else if (!resp) {
+      fbText = "Too Slow!";
+    }
+
+    let tFb = null, tIti;
+    const tWordOff = await flip(() => {
+      if (fbText) { fbEl.textContent = fbText; fbEl.style.color = fbColor; showOnly("feedback"); }
+      else showOnly(null);
+    });
+    if (fbText) {
+      tFb = tWordOff;
+      tIti = await flipAt(tFb + FEEDBACK_MS, () => showOnly(null));
+    } else {
+      tIti = tWordOff;
+    }
+    const tEnd = await flipAt(tIti + ITI_MS);
+
+    const row = {
+      phase: info.phase,
+      block_num: info.blockNum,
+      block_type: info.blockType,
+      trial_num: info.trialNum,
+      words_file: info.wordsFile,
+      word: t.word,
+      ink_color: c.name,
+      correct_key: c.key,
+      response_key: resp ? resp.key : "timeout",
+      is_correct: correct,
+      rt_ms: resp ? Math.round((resp.t - tWord) * 10) / 10 : "",
+      timestamp: new Date(wall0 + (tWord - t0)).toISOString(),
+      "trial.started": sec(tFix),
+      "fixation.started": sec(tFix),
+      "fixation.stopped": sec(tWord),
+      "target.started": sec(tWord),
+      "key_resp.started": sec(tWord),
+      "key_resp.keys": resp ? resp.key : "",
+      "key_resp.corr": correct,
+      "key_resp.rt": resp ? dur(resp.t - tWord) : "",
+      "target.stopped": sec(tWordOff),
+      "feedback.started": tFb === null ? "" : sec(tFb),
+      "feedback.stopped": tFb === null ? "" : sec(tIti),
+      "iti.started": sec(tIti),
+      "iti.stopped": sec(tEnd),
+      "trial.stopped": sec(tEnd),
+      ...info.loops,
+    };
+    rows.push(row);
+  }
+
+  // =====================================================================================
+  // INSTRUCTION AND REST SCREENS
+  // =====================================================================================
+  // Show a text screen and wait for SPACE. SPACE is accepted only after minMs.
+  async function instruct(title, bodyHtml, pressHtml, minMs = 0) {
+    $("instr-title").textContent = title;
+    $("instr-body").innerHTML = bodyHtml;
+    $("instr-press").innerHTML = minMs ? "&nbsp;" : pressHtml;
+    setProgress("");
+    show("s-instr");
+    if (minMs) {
+      const end = performance.now() + minMs;
+      for (let left = minMs; left > 0; left = end - performance.now()) {
+        $("instr-press").textContent = "You can continue in " + Math.ceil(left / 1000) + " s";
+        await new Promise((r) => setTimeout(r, Math.min(left, 250)));
+      }
+      $("instr-press").innerHTML = pressHtml;
+    }
+    await waitForKey([" "]);
+    showOnly(null);
+    show("s-trial");
+  }
+
+  const keymapHtml = () =>
+    `<div class="keymap">` + COLORS.map((c, i) =>
+      `<span class="key"><span class="cap" style="background:${c.css}">${c.key.toUpperCase()}</span>${c.label}</span>`).join("") +
+    `</div>`;
+
+  // =====================================================================================
+  // RESULTS & CSV
+  // =====================================================================================
+  function summarize(blockType) {
+    const trials = rows.filter((d) => d.phase === "experiment" && d.block_type === blockType);
+    const correct = trials.filter((d) => d.is_correct === 1);
+    return {
+      n: trials.length,
+      meanRt: correct.length ? correct.reduce((s, d) => s + d.rt_ms, 0) / correct.length : NaN,
+      accuracy: trials.length ? 100 * correct.length / trials.length : NaN,
+    };
+  }
+
+  function showResults() {
+    const s = {};
+    const body = $("results-body");
+    body.innerHTML = "";
+    for (const [type, label] of [["neutral", "Neutral"], ["positive", "Positive"], ["negative", "Negative"]]) {
+      s[type] = summarize(type);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="lbl">${label}</td>` +
+        `<td class="num">${isNaN(s[type].meanRt) ? "-" : Math.round(s[type].meanRt) + " ms"}</td>` +
+        `<td class="num">${isNaN(s[type].accuracy) ? "-" : s[type].accuracy.toFixed(1) + "%"}</td>`;
+      body.appendChild(tr);
+    }
+
+    const diff = s.negative.meanRt - s.neutral.meanRt;
+    if (isNaN(diff)) {
+      $("score").innerHTML = "Emotional Interference Score: <b>-</b>";
+      $("score-note").textContent = "The score could not be calculated because one block had no correct responses.";
+    } else {
+      const d = Math.round(diff);
+      $("score").innerHTML = "Emotional Interference Score: <b>" + (d > 0 ? "+" : d < 0 ? "−" : "") + Math.abs(d) + " ms</b>";
+      $("score-note").textContent =
+        (d > 0 ? "You were slower to name the ink color of negative words than of neutral words. This is the emotional Stroop effect."
+          : d < 0 ? "You were faster to name the ink color of negative words than of neutral words, the opposite of the emotional Stroop effect."
+          : "You were equally fast for negative and neutral words.") +
+        " One person's score is noisy, so look at the class average.";
+    }
+
+    setProgress("");
+    $("legend").hidden = true;
+    document.body.style.overflow = "auto";
+    show("s-end");
+  }
+
+  // Column order follows PsychoPy: conditions, then loop counters, routine timing and the
+  // key response, then the expInfo columns. Cells that don't apply to a row are left empty.
+  const loopCols = (loop) => ["thisRepN", "thisTrialN", "thisN", "thisIndex"].map((c) => loop + "." + c);
+  const loopVals = (loop, rep, trialN, n, index) =>
+    ({ [loop + ".thisRepN"]: rep, [loop + ".thisTrialN"]: trialN, [loop + ".thisN"]: n, [loop + ".thisIndex"]: index });
+  const CSV_HEADER = [
+    "phase", "block_num", "block_type", "trial_num",
+    // conditions columns (block_conditions.csv, the word lists, practice_conditions.csv)
+    "words_file", "word", "ink_color", "correct_key",
+    // plain-language summary of each trial, ready for analysis
+    "response_key", "is_correct", "rt_ms", "timestamp",
+    ...loopCols("practice_trials"), ...loopCols("blocks"), ...loopCols("trials"),
+    "trial.started", "fixation.started", "fixation.stopped", "target.started",
+    "key_resp.started", "key_resp.keys", "key_resp.corr", "key_resp.rt",
+    "target.stopped", "feedback.started", "feedback.stopped", "iti.started", "iti.stopped", "trial.stopped",
+    // session info
+    "participant", "session", "date", "expName", "expStart", "frameRate", "debug", "block_order",
+  ];
+
+  function csvCell(v) {
+    const s = String(v ?? "");
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function safeId() { return participantId.replace(/[^A-Za-z0-9_-]+/g, "_") || "participant"; }
+
+  function downloadCSV() {
+    const lines = [CSV_HEADER.join(",")]
+      .concat(rows.map((r) => CSV_HEADER.map((h) => csvCell({ ...r, ...expInfo }[h])).join(",")));
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    // PsychoPy file name: <participant>_<expName>_<date>.csv
+    a.download = safeId() + "_" + EXP_NAME + "_" + (DEBUG ? "DEBUG_" : "") + expInfo.date + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return a.download;
+  }
+
+  // =====================================================================================
+  // FLOW
+  // =====================================================================================
+  async function runExperiment() {
+    window.addEventListener("beforeunload", beforeUnload);
+    t0 = performance.now();
+    wall0 = Date.now();
+    const startDate = new Date(wall0);
+    rows = [];
+
+    // Random assignment to one of the 6 block orders.
+    const order = BLOCK_ORDERS[Math.floor(Math.random() * BLOCK_ORDERS.length)];
+    expInfo = {
+      participant: participantId,
+      session: "001",
+      date: psychopyDate(startDate),
+      expName: EXP_NAME,
+      expStart: startDate.toISOString(),
+      frameRate: "",
+      debug: DEBUG ? 1 : 0,
+      block_order: order.map((i) => BLOCKS[i].block_type).join("-"),
+    };
+
+    $("legend").innerHTML = COLORS.map((c) =>
+      `<span><i style="background:${c.css}"></i>[${c.key.toUpperCase()}] ${c.label}</span>`).join("");
+    $("legend").hidden = false;
+
+    // Instructions; the refresh rate is measured while they are on screen.
+    const fps = measureFrameRate().then((r) => { expInfo.frameRate = Math.round(r * 100) / 100; });
+    const practice = makePracticeTrials();
+    await instruct("Color Naming Task",
+      `<p>On each trial a cross (+) appears, followed by a word or a string of letters printed in <strong>red</strong>, <strong>blue</strong>, <strong>green</strong> or <strong>yellow</strong>.</p>
+       <p>Your task is to press the key for the <strong>ink color</strong> as quickly and accurately as you can. Ignore what the word says.</p>
+       ${keymapHtml()}
+       <p>Each key is the first letter of its color. Rest one finger on each of the four keys before you start (for example, your left hand on <kbd>R</kbd> and <kbd>G</kbd> and your right hand on <kbd>Y</kbd> and <kbd>B</kbd>) and keep them there, so you don't need to look down. The key reminder stays at the bottom of the screen.</p>
+       <p>You will start with ${practice.length} practice trials, and you will be told whether each answer was correct.</p>`,
+      "Press <kbd>SPACE</kbd> to start the practice.");
+    await fps;
+
+    for (const [n, t] of practice.entries()) {
+      await runTrial(t, {
+        phase: "practice", blockNum: 0, blockType: "practice", trialNum: n + 1, wordsFile: "",
+        progress: "Practice — Trial " + (n + 1) + "/" + practice.length,
+        loops: loopVals("practice_trials", 0, n, n, t.index),
+      });
+    }
+
+    const nPerBlock = BLOCKS[0].words.length * N_REPS;
+    await instruct("Practice Complete",
+      `<p>Now the real task begins. There are ${order.length} blocks of ${nPerBlock} trials, with a short break between blocks.</p>
+       <p>From now on you will see real words. Keep pressing the key for the <strong>ink color</strong>, and ignore what the word means.</p>
+       <p>You will no longer be told whether you were correct. If you take too long, you will see &ldquo;Too Slow!&rdquo;</p>`,
+      "Press <kbd>SPACE</kbd> to begin Block 1.");
+
+    for (const [b, blockIndex] of order.entries()) {
+      const block = BLOCKS[blockIndex];
+      const trials = makeBlockTrials(block.words);
+      for (const [n, t] of trials.entries()) {
+        await runTrial(t, {
+          phase: "experiment", blockNum: b + 1, blockType: block.block_type, trialNum: n + 1, wordsFile: block.words_file,
+          progress: "Block " + (b + 1) + "/" + order.length + " — Trial " + (n + 1) + "/" + trials.length,
+          loops: {
+            ...loopVals("blocks", 0, b, b, blockIndex),
+            ...loopVals("trials", t.rep, t.trialN, n, t.index),
+          },
+        });
+      }
+      if (b < order.length - 1) {
+        await instruct("Block " + (b + 1) + " complete",
+          `<p style="text-align:center">Take a short breather.</p>`,
+          "Press <kbd>SPACE</kbd> when ready for Block " + (b + 2) + ".",
+          REST_MIN_MS);
+      }
+    }
+
+    finished = true;
+    window.removeEventListener("beforeunload", beforeUnload);
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    showResults();
+    // Save the data automatically; the button stays as a backup.
+    const name = downloadCSV();
+    $("dl-msg").textContent = "Your data was downloaded automatically as " + name +
+      ". If you can't find it, click the button to download it again.";
+  }
+
+  function tryStart() {
+    if (started) return;
+    const v = $("pid").value.trim();
+    if (!v) { $("pid-err").textContent = "Please enter a participant ID."; $("pid").focus(); return; }
+    started = true;
+    participantId = v;
+    runExperiment();
+  }
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  }
+
+  // Keep the page from scrolling on SPACE or the arrow keys during the task.
+  window.addEventListener("keydown", (e) => {
+    if (finished) return;
+    const typing = e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
+    if (!typing && [" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"].includes(e.key)) {
+      e.preventDefault();
+    }
+  });
+
+  if (DEBUG) $("debug-badge").hidden = false;
+  $("btn-start").addEventListener("click", tryStart);
+  $("btn-fullscreen").addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", () => {
+    $("btn-fullscreen").textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+  });
+  $("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+  $("btn-download").addEventListener("click", () => {
+    if (finished) $("dl-msg").textContent = "Downloaded " + downloadCSV();
+  });
+  $("pid").value = randomParticipantId();
+  $("pid").focus();
+  $("pid").select();
+})();
+</script>
+</body>
+</html>
