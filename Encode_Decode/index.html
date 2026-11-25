@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Encode / Decode: a two-person code game</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: transparent; color: #1e293b; }
+    /* standalone page (not inside a slide iframe) */
+    body.standalone { background: #f1f5f9; padding: 0.7rem; }
+    .wrap { max-width: 660px; margin: 0 auto; }
+    .hdr { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin: 0.1rem 0.2rem 0.5rem; }
+    .hdr h1 { margin: 0; font-size: 1.3rem; color: #0f172a; }
+    .hdr .tag { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #ffffff; border-radius: 999px; padding: 0.15rem 0.6rem; background: #64748b; white-space: nowrap; }
+    .hdr .tag.enc { background: #0369a1; } .hdr .tag.dec { background: #166534; }
+    .card { background: #ffffff; border: 2px solid #cbd5e1; border-radius: 14px; padding: 0.8rem 0.85rem; margin-bottom: 0.6rem; }
+    h2 { margin: 0 0 0.35rem; font-size: 1.02rem; color: #0f172a; }
+    p { margin: 0.3rem 0; font-size: 0.92rem; line-height: 1.4; }
+    .muted { color: #64748b; font-size: 0.82rem; }
+    .warn { color: #be123c; font-weight: 700; font-size: 0.85rem; }
+    button { font: inherit; cursor: pointer; }
+    .btn { display: block; width: 100%; border: 0; border-radius: 10px; padding: 0.7rem 0.9rem; background: #1769aa; color: #ffffff; font-size: 1rem; font-weight: 800; margin-top: 0.5rem; }
+    .btn small { display: block; font-weight: 500; font-size: 0.78rem; opacity: 0.9; }
+    .btn.alt { background: #166534; } .btn.gray { background: #64748b; }
+    .btn:disabled { background: #cbd5e1; color: #64748b; cursor: not-allowed; }
+    .btn:hover:not(:disabled), .btn:focus-visible:not(:disabled) { filter: brightness(0.92); }
+    .mini { border: 2px solid #94a3b8; border-radius: 8px; background: #ffffff; color: #334155; font-size: 0.82rem; font-weight: 700; padding: 0.35rem 0.7rem; }
+    .mini:hover { background: #f1f5f9; }
+    .link { border: 0; background: none; color: #1769aa; font-weight: 700; font-size: 0.85rem; padding: 0.4rem 0; }
+    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    .seg { display: flex; border: 2px solid #cbd5e1; border-radius: 10px; overflow: hidden; margin: 0.5rem 0 0.2rem; }
+    .seg button { flex: 1 1 0; border: 0; background: #f8fafc; color: #334155; font-size: 0.86rem; font-weight: 700; padding: 0.55rem 0.3rem; }
+    .seg button[aria-pressed="true"] { background: #1e293b; color: #ffffff; }
+    /* rule card */
+    .feat { border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.4rem 0.5rem; margin-top: 0.45rem; }
+    .fname { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: #475569; margin-bottom: 0.25rem; }
+    .cells { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; }
+    .cell { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; border: 2px solid #cbd5e1; border-radius: 9px; background: #f8fafc; padding: 0.3rem 0.1rem 0.25rem; color: #334155; min-height: 4.4rem; }
+    button.cell.on { border-color: #1769aa; background: #e0f2fe; box-shadow: 0 0 0 2px #1769aa inset; }
+    .cell svg { width: 1.7rem; height: 1.7rem; display: block; }
+    .cell .lab { font-size: 0.7rem; color: #475569; }
+    .cell .dig { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.25rem; font-weight: 800; color: #0f172a; line-height: 1; }
+    .cell .dig.empty { color: #94a3b8; }
+    .pad { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.35rem; margin-top: 0.55rem; }
+    .pad button { border: 2px solid #94a3b8; border-radius: 9px; background: #ffffff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.25rem; font-weight: 800; color: #0f172a; padding: 0.45rem 0; }
+    .pad button:disabled { background: #f1f5f9; color: #cbd5e1; border-color: #e2e8f0; cursor: not-allowed; }
+    .order { margin-top: 0.55rem; font-size: 0.86rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+    .chip { display: inline-block; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.78rem; font-weight: 800; color: #ffffff; }
+    .chip.shape { background: #0369a1; } .chip.color { background: #b45309; } .chip.count { background: #6b21a8; }
+    /* pictures and numbers */
+    .tile { display: block; width: 100%; height: auto; }
+    .num { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; font-size: 1.3rem; letter-spacing: 0.12em; color: #0f172a; text-align: center; line-height: 1.1; }
+    .num span.shape { color: #0369a1; } .num span.color { color: #b45309; } .num span.count { color: #6b21a8; }
+    .numlab { display: flex; justify-content: center; gap: 0.25rem; font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+    .numlab span.shape { color: #0369a1; } .numlab span.color { color: #b45309; } .numlab span.count { color: #6b21a8; }
+    .pairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 0.45rem; margin-top: 0.45rem; }
+    .pair { border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.3rem; background: #f8fafc; }
+    .pair .arrow { text-align: center; color: #64748b; font-size: 0.85rem; line-height: 1; margin: 0.1rem 0; }
+    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr)); gap: 0.45rem; margin-top: 0.45rem; }
+    .slot { border: 2px solid #cbd5e1; border-radius: 10px; padding: 0.3rem; background: #ffffff; text-align: center; position: relative; }
+    button.slot.on { border-color: #166534; box-shadow: 0 0 0 2px #166534 inset; background: #f0fdf4; }
+    .slot.right { border-color: #166534; background: #dcfce7; } .slot.wrong { border-color: #be123c; background: #fee2e2; }
+    .slot .mark { position: absolute; top: 0.15rem; right: 0.3rem; font-size: 1.05rem; font-weight: 800; }
+    .slot.right .mark { color: #166534; } .slot.wrong .mark { color: #be123c; }
+    .slot .truth { border-top: 2px dashed #94a3b8; margin-top: 0.3rem; padding-top: 0.25rem; }
+    .slot .cap { font-size: 0.62rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+    .picker { margin-top: 0.5rem; }
+    .prow { display: grid; grid-template-columns: 4.6rem repeat(4, minmax(0, 1fr)); gap: 0.35rem; align-items: center; margin-top: 0.35rem; }
+    .prow .pl { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+    .prow .pl.shape { color: #0369a1; } .prow .pl.color { color: #b45309; } .prow .pl.count { color: #6b21a8; }
+    .opt { border: 2px solid #cbd5e1; border-radius: 9px; background: #ffffff; padding: 0.3rem 0.1rem; display: flex; flex-direction: column; align-items: center; gap: 0.05rem; color: #334155; font-size: 0.7rem; min-height: 3.1rem; justify-content: center; }
+    .opt svg { width: 1.5rem; height: 1.5rem; display: block; }
+    .opt[aria-pressed="true"] { border-color: #166534; background: #dcfce7; box-shadow: 0 0 0 2px #166534 inset; font-weight: 800; }
+    .codebox { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.45rem; font-weight: 800; letter-spacing: 0.08em; text-align: center; background: #0f172a; color: #fde68a; border-radius: 10px; padding: 0.5rem 0.3rem; margin: 0.4rem 0; user-select: all; }
+    input.code { width: 100%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.3rem; font-weight: 800; letter-spacing: 0.08em; text-align: center; text-transform: uppercase; border: 2px solid #94a3b8; border-radius: 10px; padding: 0.55rem 0.3rem; color: #0f172a; }
+    .score { font-size: 1.5rem; font-weight: 800; text-align: center; color: #0f172a; margin: 0.2rem 0; }
+    .debrief { border-left: 6px solid #f59e0b; background: #fffbeb; border-radius: 8px; padding: 0.5rem 0.7rem; margin-top: 0.5rem; }
+    .debrief p { font-size: 0.9rem; }
+    .pass { text-align: center; padding: 1.6rem 0.8rem; }
+    .pass .big { font-size: 2.6rem; line-height: 1; }
+    @media (min-width: 560px) { .pairs { grid-template-columns: repeat(6, minmax(0, 1fr)); } .slots { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr"><h1>Encode / Decode</h1><span class="tag" id="tag">Pair game</span></div>
+    <main id="app" aria-live="polite"></main>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+      const SHAPES = ['circle', 'square', 'triangle', 'star'];
+      const COLORS = [{ n: 'blue', h: '#0ea5e9' }, { n: 'orange', h: '#f59e0b' }, { n: 'purple', h: '#a855f7' }, { n: 'green', h: '#16a34a' }];
+      const COUNTS = [1, 2, 3, 4];
+      const FEATS = ['shape', 'color', 'count'];
+      const FLABEL = { shape: 'Shape', color: 'Color', count: 'How many' };
+      const ORDERS = [['shape', 'color', 'count'], ['shape', 'count', 'color'], ['color', 'shape', 'count'],
+                      ['color', 'count', 'shape'], ['count', 'shape', 'color'], ['count', 'color', 'shape']];
+      const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';   // Crockford base 32: no I, L, O, U
+      const MULT = [504, 56, 7, 1];
+      const app = document.getElementById('app');
+      const tag = document.getElementById('tag');
+
+      const S = {
+        view: 'home', round: 1, role: null,
+        rule: { digits: { shape: [null, null, null, null], color: [null, null, null, null], count: [null, null, null, null] }, order: 0 },
+        cell: { f: 'shape', i: 0 }, seed: 0, mode: 0,
+        examples: [], secret: [], guess: [], active: 0, checked: false, hint: false,
+        codeText: '', codeErr: '', copied: false, sameDevice: false,
+      };
+
+      /* ---------- drawing ---------- */
+      function shapeSvg(shape, cx, cy, r, fill) {
+        if (shape === 'circle') return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
+        if (shape === 'square') { const s = r * 0.9; return `<rect x="${cx - s}" y="${cy - s}" width="${2 * s}" height="${2 * s}" rx="${r * 0.12}" fill="${fill}"/>`; }
+        if (shape === 'triangle') return `<path d="M${cx} ${cy - r} L${cx + r * 0.98} ${cy + r * 0.8} L${cx - r * 0.98} ${cy + r * 0.8} Z" fill="${fill}"/>`;
+        if (shape === 'star') {
+          const pts = [];
+          for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5; const rr = k % 2 ? r * 0.45 : r * 1.08; pts.push((cx + rr * Math.cos(a)).toFixed(1) + ',' + (cy + rr * Math.sin(a)).toFixed(1)); }
+          return `<polygon points="${pts.join(' ')}" fill="${fill}"/>`;
+        }
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fill}" stroke-width="3" stroke-dasharray="5 4"/><text x="${cx}" y="${cy + r * 0.4}" text-anchor="middle" font-size="${r * 1.2}" font-weight="800" fill="${fill}">?</text>`;
+      }
+      const LAY = { 1: [[50, 50, 27]], 2: [[29, 50, 19], [71, 50, 19]], 3: [[50, 29, 17], [28, 70, 17], [72, 70, 17]], 4: [[29, 29, 16], [71, 29, 16], [29, 71, 16], [71, 71, 16]] };
+      function describe(im) { const n = COUNTS[im.count]; return `${n} ${COLORS[im.color].n} ${SHAPES[im.shape]}${n > 1 ? 's' : ''}`; }
+      function tile(im) {
+        const empty = im.shape == null && im.color == null && im.count == null;
+        let inner, label;
+        if (empty) { inner = '<text x="50" y="66" text-anchor="middle" font-size="46" font-weight="800" fill="#cbd5e1">?</text>'; label = 'not chosen yet'; }
+        else {
+          const fill = im.color == null ? '#cbd5e1' : COLORS[im.color].h;
+          const shape = im.shape == null ? 'unknown' : SHAPES[im.shape];
+          inner = LAY[im.count == null ? 1 : COUNTS[im.count]].map(([x, y, r]) => shapeSvg(shape, x, y, r, fill)).join('');
+          label = (im.shape != null && im.color != null && im.count != null) ? describe(im) : 'partly chosen picture';
+        }
+        return `<svg class="tile" viewBox="0 0 100 100" role="img" aria-label="${label}"><rect x="2" y="2" width="96" height="96" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>${inner}</svg>`;
+      }
+      function icon(f, i) {
+        if (f === 'shape') return `<svg viewBox="0 0 40 40" aria-hidden="true">${shapeSvg(SHAPES[i], 20, 21, 15, '#475569')}</svg>`;
+        if (f === 'color') return `<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" fill="${COLORS[i].h}"/></svg>`;
+        return `<svg viewBox="0 0 40 40" aria-hidden="true"><text x="20" y="29" text-anchor="middle" font-size="24" font-weight="800" fill="#475569">&#215;${COUNTS[i]}</text></svg>`;
+      }
+      function valName(f, i) { return f === 'shape' ? SHAPES[i] : f === 'color' ? COLORS[i].n : String(COUNTS[i]); }
+
+      /* ---------- rule, rounds, pair code ---------- */
+      function ruleDone() { return FEATS.every((f) => S.rule.digits[f].every((d) => d != null)); }
+      function encode(im) { return ORDERS[S.rule.order].map((f) => S.rule.digits[f][im[f]]); }
+      function numHtml(im, labels) {
+        const order = ORDERS[S.rule.order]; const d = encode(im);
+        const digits = d.map((x, k) => `<span${labels ? ` class="${order[k]}"` : ''}>${x == null ? '?' : x}</span>`).join('');
+        const lab = labels ? `<div class="numlab">${order.map((f) => `<span class="${f}">${f === 'count' ? 'many' : f}</span>`).join('')}</div>` : '';
+        return `<div class="num" aria-label="number ${d.join(' ')}">${digits}</div>${lab}`;
+      }
+      function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+      function makeRound(seed, mode) {
+        const rnd = mulberry(seed * 2 + mode + 90210);
+        const key = (im) => im.shape * 16 + im.color * 4 + im.count;
+        const rand = () => ({ shape: Math.floor(rnd() * 4), color: Math.floor(rnd() * 4), count: Math.floor(rnd() * 4) });
+        const draw = (n, taken) => { const out = []; while (out.length < n) { const im = rand(); if (!taken.has(key(im))) { taken.add(key(im)); out.push(im); } } return out; };
+        if (mode === 0) return { examples: [], secret: draw(5, new Set()) };
+        // Round 2: six example pictures that between them show every shape, color and count
+        let ex, taken;
+        for (let tries = 0; tries < 5000; tries++) {
+          taken = new Set(); ex = draw(6, taken);
+          if (FEATS.every((f) => new Set(ex.map((im) => im[f])).size === 4)) break;
+        }
+        return { examples: ex, secret: draw(3, taken) };
+      }
+      function permIdx(a) { const pool = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; let idx = 0; a.forEach((d, i) => { const r = pool.indexOf(d); idx += r * MULT[i]; pool.splice(r, 1); }); return idx; }
+      function permFrom(idx) { const pool = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; return MULT.map((m) => { const r = Math.floor(idx / m); idx %= m; return pool.splice(r, 1)[0]; }); }
+      function checkChar(chars) { let s = 0; chars.forEach((c, i) => { s += ALPHA.indexOf(c) * (i + 3); }); return ALPHA[s % 32]; }
+      function makeCode() {
+        let v = permIdx(S.rule.digits.shape);
+        v = v * 5040 + permIdx(S.rule.digits.color);
+        v = v * 5040 + permIdx(S.rule.digits.count);
+        v = ((v * 6 + S.rule.order) * 2 + S.mode) * 512 + S.seed;
+        const chars = []; for (let i = 0; i < 10; i++) { chars.unshift(ALPHA[v % 32]); v = Math.floor(v / 32); }
+        chars.push(checkChar(chars));
+        return chars.join('');
+      }
+      function pretty(code) { return code.slice(0, 4) + '-' + code.slice(4, 8) + '-' + code.slice(8); }
+      function readCode(text) {
+        const clean = text.toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1').replace(/[^0-9A-Z]/g, '');
+        if (clean.length !== 11 || [...clean].some((c) => ALPHA.indexOf(c) < 0)) return null;
+        const chars = [...clean.slice(0, 10)];
+        if (checkChar(chars) !== clean[10]) return null;
+        let v = 0; chars.forEach((c) => { v = v * 32 + ALPHA.indexOf(c); });
+        const seed = v % 512; v = Math.floor(v / 512);
+        const mode = v % 2; v = Math.floor(v / 2);
+        const order = v % 6; v = Math.floor(v / 6);
+        const pn = v % 5040; v = Math.floor(v / 5040);
+        const pc = v % 5040; v = Math.floor(v / 5040);
+        if (v >= 5040) return null;
+        return { seed, mode, order, digits: { shape: permFrom(v), color: permFrom(pc), count: permFrom(pn) } };
+      }
+      function startDecode(data) {
+        S.rule.digits = data.digits; S.rule.order = data.order; S.seed = data.seed; S.mode = data.mode; S.round = data.mode + 1;
+        const r = makeRound(S.seed, S.mode); S.examples = r.examples; S.secret = r.secret;
+        S.guess = S.secret.map(() => ({ shape: null, color: null, count: null }));
+        S.active = 0; S.checked = false; S.hint = false; S.role = 'decoder'; S.view = 'decode';
+      }
+      function slotDone(g) { return g.shape != null && g.color != null && g.count != null; }
+
+      /* ---------- views ---------- */
+      function ruleCard(editable) {
+        return FEATS.map((f) => `<div class="feat"><div class="fname">${FLABEL[f]}</div><div class="cells">` + [0, 1, 2, 3].map((i) => {
+          const d = S.rule.digits[f][i]; const on = editable && S.cell.f === f && S.cell.i === i;
+          const body = `${icon(f, i)}<span class="lab">${f === 'count' ? '&#160;' : valName(f, i)}</span><span class="dig${d == null ? ' empty' : ''}">${d == null ? '?' : d}</span>`;
+          return editable ? `<button type="button" class="cell${on ? ' on' : ''}" data-act="cell" data-f="${f}" data-i="${i}" aria-label="${valName(f, i)}: ${d == null ? 'no digit yet' : 'digit ' + d}">${body}</button>`
+                          : `<div class="cell">${body}</div>`;
+        }).join('') + '</div></div>').join('');
+      }
+      function orderLine() { return ORDERS[S.rule.order].map((f) => `<span class="chip ${f}">${FLABEL[f]}</span>`).join(' '); }
+      function vHome() {
+        return `<section class="card">
+          <p>Work in pairs. The <b>Encoder</b> turns pictures into numbers with a secret rule. The <b>Decoder</b> turns the numbers back into pictures.</p>
+          <div class="seg" role="group" aria-label="Which round">
+            <button type="button" data-act="round" data-v="1" aria-pressed="${S.round === 1}">Round 1 &#183; Share the rule</button>
+            <button type="button" data-act="round" data-v="2" aria-pressed="${S.round === 2}">Round 2 &#183; Examples only</button>
+          </div>
+          <p class="muted">${S.round === 1 ? 'The Encoder shows the rule to the Decoder, who uses it to turn five numbers back into pictures.'
+            : 'The Encoder keeps the rule secret. The Decoder gets six pictures with their numbers, works the rule out, and decodes three new numbers.'}</p>
+          <button type="button" class="btn" data-act="be-encoder">I&#8217;m the Encoder<small>I make the rule (the round above applies)</small></button>
+          <button type="button" class="btn alt" data-act="be-decoder">I&#8217;m the Decoder<small>on my own device, with my partner&#8217;s code</small></button>
+        </section>`;
+      }
+      function vJoin() {
+        return `<section class="card"><h2>Decoder: enter your partner&#8217;s code</h2>
+          <p class="muted">It is on the Encoder&#8217;s screen, eleven letters and digits.</p>
+          <input class="code" id="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16" placeholder="XXXX-XXXX-XXX" value="${S.codeText}" aria-label="Pair code">
+          ${S.codeErr ? `<p class="warn">${S.codeErr}</p>` : ''}
+          <button type="button" class="btn alt" data-act="join">Start decoding &#9656;</button>
+          <button type="button" class="link" data-act="home">&#9666; Back</button></section>`;
+      }
+      function vRule() {
+        const used = S.rule.digits[S.cell.f].filter((d, i) => d != null && i !== S.cell.i);
+        const pad = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button type="button" data-act="digit" data-v="${d}"${used.includes(d) ? ' disabled' : ''} aria-label="digit ${d}">${d}</button>`).join('');
+        const sample = { shape: 2, color: 0, count: 1 };
+        return `<section class="card"><h2>Step 1 &#183; Make your rule</h2>
+          <p>Give every shape, color and count a digit. <b>Tap a box, then tap a digit.</b></p>
+          ${ruleCard(true)}
+          <div class="pad" role="group" aria-label="Digits for ${valName(S.cell.f, S.cell.i)}">${pad}</div>
+          <div class="order"><span>Digit order:</span> ${orderLine()} <button type="button" class="mini" data-act="order">&#8635; Change</button></div>
+          <div class="row" style="margin-top: 0.5rem;"><div style="width: 3.4rem;">${tile(sample)}</div><div><div class="muted">For example, this picture becomes</div>${numHtml(sample, true)}</div></div>
+          <div class="row" style="margin-top: 0.5rem;"><button type="button" class="mini" data-act="random">&#127922; Random rule</button><button type="button" class="mini" data-act="clear">Clear</button></div>
+          <button type="button" class="btn" data-act="lock"${ruleDone() ? '' : ' disabled'}>${ruleDone() ? 'Encode my pictures &#9656;' : 'Fill in all twelve digits first'}</button>
+        </section>`;
+      }
+      function pairs(list) { return `<div class="pairs">${list.map((im) => `<div class="pair">${tile(im)}<div class="arrow">&#8595;</div>${numHtml(im, false)}</div>`).join('')}</div>`; }
+      function vSecret() {
+        const code = makeCode();
+        const top = S.mode === 0
+          ? `<h2>Step 2 &#183; Your five secret pictures, as numbers</h2><p class="warn">Keep this screen to yourself.</p>${pairs(S.secret)}`
+          : `<h2>Step 2 &#183; Your partner gets these six examples</h2><p class="muted">They see each picture with its number, but <b>not your rule</b>.</p>${pairs(S.examples)}
+             <h2 style="margin-top: 0.7rem;">&#8230;and must decode these three</h2><p class="warn">Keep these to yourself.</p>${pairs(S.secret)}`;
+        return `<section class="card">${top}</section>
+          <section class="card"><h2>Step 3 &#183; Give it to your Decoder</h2>
+          <p><b>One device:</b> hand it over. The pictures will be hidden.</p>
+          <button type="button" class="btn alt" data-act="handover">Hand over to my partner &#9656;</button>
+          <p style="margin-top: 0.7rem;"><b>Two devices:</b> your partner opens this page, taps <b>Decoder</b>, and types</p>
+          <div class="codebox" aria-label="Pair code">${pretty(code)}</div>
+          <div class="row"><button type="button" class="mini" data-act="copy">${S.copied ? '&#10003; Link copied' : 'Copy a link instead'}</button></div></section>`;
+      }
+      function vPass() {
+        return `<section class="card pass"><div class="big">&#128241;&#10145;&#65039;</div><h2 style="margin-top: 0.6rem;">Pass this device to your partner</h2>
+          <p class="muted">Encoder: no peeking from here on.</p>
+          <button type="button" class="btn alt" data-act="begin">I&#8217;m the Decoder: start &#9656;</button></section>`;
+      }
+      function vDecode() {
+        const labels = S.mode === 0 || S.hint || S.checked;
+        const know = S.mode === 0
+          ? `<section class="card"><h2>The rule from your partner</h2><div class="order" style="margin-top: 0;"><span>Digit order:</span> ${orderLine()}</div>${ruleCard(false)}</section>`
+          : `<section class="card"><h2>Examples from your partner</h2><p class="muted">No rule this time. Each picture is shown with its number. Work out what each digit means.</p>${pairs(S.examples)}
+             ${S.hint || S.checked ? `<div class="order"><span>Digit order:</span> ${orderLine()}</div>` : '<button type="button" class="link" data-act="hint">Stuck? Show which digit is which feature</button>'}
+             ${S.checked ? ruleCard(false) : ''}</section>`;
+        const slots = S.secret.map((im, i) => {
+          const g = S.guess[i]; const ok = S.checked && FEATS.every((f) => g[f] === im[f]);
+          const inner = `${numHtml(im, labels)}<div class="cap">${S.checked ? 'your picture' : ''}</div>${tile(g)}` +
+            (S.checked ? `<span class="mark">${ok ? '&#10003;' : '&#10007;'}</span>` + (ok ? '' : `<div class="truth"><div class="cap">it was</div>${tile(im)}</div>`) : '');
+          return S.checked ? `<div class="slot ${ok ? 'right' : 'wrong'}">${inner}</div>`
+                           : `<button type="button" class="slot${S.active === i ? ' on' : ''}" data-act="slot" data-i="${i}" aria-label="Number ${i + 1}">${inner}</button>`;
+        }).join('');
+        let lower;
+        if (!S.checked) {
+          const g = S.guess[S.active];
+          const rows = FEATS.map((f) => `<div class="prow"><span class="pl ${f}">${FLABEL[f]}</span>` + [0, 1, 2, 3].map((i) =>
+            `<button type="button" class="opt" data-act="pick" data-f="${f}" data-i="${i}" aria-pressed="${g[f] === i}" aria-label="${valName(f, i)}">${icon(f, i)}${f === 'count' ? '' : `<span>${valName(f, i)}</span>`}</button>`).join('') + '</div>').join('');
+          const all = S.guess.every(slotDone);
+          lower = `<div class="picker"><p class="muted">Build the picture for number ${S.active + 1} of ${S.secret.length}:</p>${rows}</div>
+            <button type="button" class="btn alt" data-act="check"${all ? '' : ' disabled'}>${all ? 'Check my pictures' : 'Decode every number first'}</button>`;
+        } else {
+          const n = S.secret.filter((im, i) => FEATS.every((f) => S.guess[i][f] === im[f])).length;
+          const msg = S.mode === 0
+            ? '<p><b>You had the rule, so decoding was a lookup.</b> A brain never hands over its rule.</p><p>Now try <b>Round 2</b>: swap roles, and this time the Encoder keeps the rule secret.</p>'
+            : '<p><b>No rule this time.</b> You worked it out from <b>paired examples</b>: pictures you could see next to the numbers they produced.</p><p>Hold on to that. It is how every brain decoder is built.</p>';
+          lower = `<div class="score">${n} of ${S.secret.length} correct</div><div class="debrief">${msg}</div>
+            <button type="button" class="btn" data-act="next">${S.mode === 0 ? 'Swap roles: play Round 2 &#9656;' : 'Play again &#9656;'}</button>
+            <button type="button" class="link" data-act="home">&#9666; Back to the start</button>`;
+        }
+        return `${know}<section class="card"><h2>${S.checked ? 'Results' : 'Numbers to decode'}</h2>${S.checked ? '' : '<p class="muted">Tap a number, then build its picture below.</p>'}
+          <div class="slots">${slots}</div>${lower}</section>`;
+      }
+      function render() {
+        const v = { home: vHome, join: vJoin, rule: vRule, secret: vSecret, pass: vPass, decode: vDecode }[S.view]();
+        app.innerHTML = v;
+        tag.className = 'tag' + (S.role === 'encoder' ? ' enc' : S.role === 'decoder' ? ' dec' : '');
+        tag.textContent = S.role === 'encoder' ? `Encoder · Round ${S.round}` : S.role === 'decoder' ? `Decoder · Round ${S.round}` : 'Pair game';
+      }
+
+      /* ---------- actions ---------- */
+      function nextEmptyCell() {
+        for (const f of FEATS) for (let i = 0; i < 4; i++) if (S.rule.digits[f][i] == null) { S.cell = { f, i }; return; }
+      }
+      function freshRule() { FEATS.forEach((f) => { S.rule.digits[f] = [null, null, null, null]; }); S.rule.order = 0; S.cell = { f: 'shape', i: 0 }; }
+      const acts = {
+        round(t) { S.round = Number(t.dataset.v); },
+        'be-encoder'() { S.role = 'encoder'; S.mode = S.round - 1; freshRule(); S.view = 'rule'; },
+        'be-decoder'() { S.role = 'decoder'; S.codeErr = ''; S.view = 'join'; },
+        home() { S.role = null; S.view = 'home'; },
+        join() {
+          const el = document.getElementById('code'); S.codeText = el ? el.value : '';
+          const data = readCode(S.codeText);
+          if (!data) { S.codeErr = 'That code does not match. Check it against your partner’s screen and try again.'; return; }
+          S.codeErr = ''; S.sameDevice = false; startDecode(data);
+        },
+        cell(t) { S.cell = { f: t.dataset.f, i: Number(t.dataset.i) }; },
+        digit(t) { S.rule.digits[S.cell.f][S.cell.i] = Number(t.dataset.v); nextEmptyCell(); },
+        order() { S.rule.order = (S.rule.order + 1) % 6; },
+        random() {
+          FEATS.forEach((f) => { const pool = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; S.rule.digits[f] = [0, 1, 2, 3].map(() => pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); });
+          S.rule.order = Math.floor(Math.random() * 6);
+        },
+        clear() { freshRule(); },
+        lock() {
+          if (!ruleDone()) return;
+          S.seed = Math.floor(Math.random() * 512);
+          const r = makeRound(S.seed, S.mode); S.examples = r.examples; S.secret = r.secret; S.copied = false; S.view = 'secret';
+        },
+        copy() {
+          const url = location.href.split('#')[0] + '#d=' + makeCode();
+          try { navigator.clipboard.writeText(url).then(() => { S.copied = true; render(); }, () => {}); } catch (e) { /* clipboard not available */ }
+        },
+        handover() { S.sameDevice = true; S.view = 'pass'; },
+        begin() { startDecode({ digits: S.rule.digits, order: S.rule.order, seed: S.seed, mode: S.mode }); },
+        slot(t) { S.active = Number(t.dataset.i); },
+        pick(t) {
+          const g = S.guess[S.active]; g[t.dataset.f] = Number(t.dataset.i);
+          if (slotDone(g)) { const nxt = S.guess.findIndex((x) => !slotDone(x)); if (nxt >= 0) S.active = nxt; }
+        },
+        hint() { S.hint = true; },
+        check() { if (S.guess.every(slotDone)) S.checked = true; },
+        next() { S.round = S.mode === 0 ? 2 : 1; S.role = null; S.view = 'home'; },
+      };
+      app.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
+        const fn = acts[t.dataset.act]; if (!fn) return;
+        fn(t); render();
+        if (['be-encoder', 'be-decoder', 'lock', 'handover', 'begin', 'join', 'check', 'next', 'home'].includes(t.dataset.act)) window.scrollTo(0, 0);
+      });
+      app.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'code') { acts.join(); render(); } });
+
+      function route() {
+        const h = location.hash.slice(1);
+        if (h.startsWith('d=')) { const data = readCode(h.slice(2)); if (data) { startDecode(data); return; } S.role = 'decoder'; S.codeErr = 'That link is not a valid code.'; S.view = 'join'; return; }
+        if (h === 'decoder') { S.role = 'decoder'; S.view = 'join'; return; }
+        if (h === 'encoder' || h === 'encoder2') { S.round = h === 'encoder2' ? 2 : 1; acts['be-encoder'](); return; }
+      }
+      if (window.self === window.top) document.body.classList.add('standalone');
+      route(); render();
+      window.addEventListener('hashchange', () => { route(); render(); });
+    })();
+  </script>
+</body>
+</html>
