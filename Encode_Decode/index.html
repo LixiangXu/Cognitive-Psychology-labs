@@ -65,7 +65,16 @@
     .slot .mark { position: absolute; top: 0.15rem; right: 0.3rem; font-size: 1.05rem; font-weight: 800; }
     .slot.right .mark { color: #166534; } .slot.wrong .mark { color: #be123c; }
     .slot .truth { border-top: 2px dashed #94a3b8; margin-top: 0.3rem; padding-top: 0.25rem; }
-    .slot .cap { font-size: 0.62rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+    .slot .cap, .rrow .cap { font-size: 0.62rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+    /* round 3 results: one row per number, with every picture that fits it */
+    .rrow { display: grid; grid-template-columns: 5.7rem 3.7rem 1fr; gap: 0.4rem; align-items: end; border: 2px solid #cbd5e1; border-radius: 10px; padding: 0.4rem 1.7rem 0.45rem 0.4rem; margin-top: 0.45rem; position: relative; text-align: center; }
+    .rrow.right { border-color: #166534; background: #dcfce7; } .rrow.wrong { border-color: #be123c; background: #fee2e2; }
+    .rrow .mark { position: absolute; top: 0.2rem; right: 0.45rem; font-size: 1.1rem; font-weight: 800; }
+    .rrow.right .mark { color: #166534; } .rrow.wrong .mark { color: #be123c; }
+    .rrow .cap { margin-bottom: 0.3rem; white-space: nowrap; } .rrow .cap.two { color: #b45309; }
+    .rrow > div:first-child { align-self: center; }
+    .fitset { display: flex; gap: 0.45rem; } .fitset > div { width: 3.7rem; flex: 0 0 auto; border-radius: 9px; }
+    .fitset .mine { outline: 3px solid #166534; outline-offset: 1px; }
     .picker { margin-top: 0.5rem; }
     .prow { display: grid; grid-template-columns: 4.6rem repeat(4, minmax(0, 1fr)); gap: 0.35rem; align-items: center; margin-top: 0.35rem; }
     .prow .pl { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -100,6 +109,13 @@
                       ['color', 'count', 'shape'], ['count', 'shape', 'color'], ['count', 'color', 'shape']];
       const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';   // Crockford base 32: no I, L, O, U
       const MULT = [504, 56, 7, 1];
+      // Round 3 (whole class, the instructor is the Encoder): a fixed rule that gives blue and purple
+      // the same digit, so some numbers fit two pictures. Pictures are [shape, color, count] indexes.
+      const CLASS = {
+        digits: { shape: [2, 7, 5, 9], color: [4, 1, 4, 8], count: [6, 3, 0, 7] }, order: 0,
+        examples: [[0, 0, 0], [1, 1, 1], [3, 0, 1], [2, 2, 3], [3, 3, 0], [1, 0, 2]],   // blue three times, purple once
+        secret: [[2, 1, 2], [0, 0, 1], [1, 3, 3], [3, 0, 2]],                           // numbers 2 and 4 fit two pictures
+      };
       const app = document.getElementById('app');
       const tag = document.getElementById('tag');
 
@@ -201,7 +217,23 @@
         S.guess = S.secret.map(() => ({ shape: null, color: null, count: null }));
         S.active = 0; S.checked = false; S.hint = false; S.role = 'decoder'; S.view = 'decode';
       }
+      function startClass() {
+        const im = (a) => ({ shape: a[0], color: a[1], count: a[2] });
+        FEATS.forEach((f) => { S.rule.digits[f] = CLASS.digits[f].slice(); });
+        S.rule.order = CLASS.order; S.mode = 2; S.round = 3;
+        S.examples = CLASS.examples.map(im); S.secret = CLASS.secret.map(im);
+        S.guess = S.secret.map(() => ({ shape: null, color: null, count: null }));
+        S.active = 0; S.checked = false; S.hint = true; S.sameDevice = false; S.role = 'decoder'; S.view = 'decode';
+      }
       function slotDone(g) { return g.shape != null && g.color != null && g.count != null; }
+      // every picture the current rule turns into the same number as im
+      function fits(im) {
+        const want = encode(im).join(); const out = [];
+        for (let s = 0; s < 4; s++) for (let c = 0; c < 4; c++) for (let k = 0; k < 4; k++) {
+          const x = { shape: s, color: c, count: k }; if (encode(x).join() === want) out.push(x);
+        }
+        return out;
+      }
 
       /* ---------- views ---------- */
       function ruleCard(editable) {
@@ -224,6 +256,7 @@
             : 'The Encoder keeps the rule secret. The Decoder gets six pictures with their numbers, works the rule out, and decodes three new numbers.'}</p>
           <button type="button" class="btn" data-act="be-encoder">I&#8217;m the Encoder<small>I make the rule (the round above applies)</small></button>
           <button type="button" class="btn alt" data-act="be-decoder">I&#8217;m the Decoder<small>on my own device, with my partner&#8217;s code</small></button>
+          <button type="button" class="link" data-act="class">Round 3 &#183; Whole class: your instructor is the Encoder &#9656;</button>
         </section>`;
       }
       function vJoin() {
@@ -270,13 +303,23 @@
       }
       function vDecode() {
         const labels = S.mode === 0 || S.hint || S.checked;
+        const cls = S.mode === 2;
+        const same = (a, b) => FEATS.every((f) => a[f] === b[f]);
+        const hit = (g, im) => cls ? slotDone(g) && encode(g).join() === encode(im).join() : same(g, im);
         const know = S.mode === 0
           ? `<section class="card"><h2>The rule from your partner</h2><div class="order" style="margin-top: 0;"><span>Digit order:</span> ${orderLine()}</div>${ruleCard(false)}</section>`
-          : `<section class="card"><h2>Examples from your partner</h2><p class="muted">No rule this time. Each picture is shown with its number. Work out what each digit means.</p>${pairs(S.examples)}
+          : `<section class="card"><h2>Examples from your ${cls ? 'instructor' : 'partner'}</h2><p class="muted">${cls ? 'Your instructor is the Encoder this time, and keeps the rule.' : 'No rule this time.'} Each picture is shown with its number. Work out what each digit means.</p>${pairs(S.examples)}
              ${S.hint || S.checked ? `<div class="order"><span>Digit order:</span> ${orderLine()}</div>` : '<button type="button" class="link" data-act="hint">Stuck? Show which digit is which feature</button>'}
              ${S.checked ? ruleCard(false) : ''}</section>`;
-        const slots = S.secret.map((im, i) => {
-          const g = S.guess[i]; const ok = S.checked && FEATS.every((f) => g[f] === im[f]);
+        const slots = cls && S.checked ? S.secret.map((im, i) => {
+          const g = S.guess[i]; const sols = fits(im); const ok = hit(g, im);
+          return `<div class="rrow ${ok ? 'right' : 'wrong'}"><div>${numHtml(im, true)}</div>
+            <div><div class="cap">your pick</div>${tile(g)}</div>
+            <div><div class="cap${sols.length > 1 ? ' two' : ''}">${sols.length > 1 ? sols.length + ' pictures fit' : '1 picture fits'}</div>
+              <div class="fitset">${sols.map((x) => `<div${same(x, g) ? ' class="mine"' : ''}>${tile(x)}</div>`).join('')}</div></div>
+            <span class="mark">${ok ? '&#10003;' : '&#10007;'}</span></div>`;
+        }).join('') : S.secret.map((im, i) => {
+          const g = S.guess[i]; const ok = S.checked && same(g, im);
           const inner = `${numHtml(im, labels)}<div class="cap">${S.checked ? 'your picture' : ''}</div>${tile(g)}` +
             (S.checked ? `<span class="mark">${ok ? '&#10003;' : '&#10007;'}</span>` + (ok ? '' : `<div class="truth"><div class="cap">it was</div>${tile(im)}</div>`) : '');
           return S.checked ? `<div class="slot ${ok ? 'right' : 'wrong'}">${inner}</div>`
@@ -288,19 +331,22 @@
           const rows = FEATS.map((f) => `<div class="prow"><span class="pl ${f}">${FLABEL[f]}</span>` + [0, 1, 2, 3].map((i) =>
             `<button type="button" class="opt" data-act="pick" data-f="${f}" data-i="${i}" aria-pressed="${g[f] === i}" aria-label="${valName(f, i)}">${icon(f, i)}${f === 'count' ? '' : `<span>${valName(f, i)}</span>`}</button>`).join('') + '</div>').join('');
           const all = S.guess.every(slotDone);
-          lower = `<div class="picker"><p class="muted">Build the picture for number ${S.active + 1} of ${S.secret.length}:</p>${rows}</div>
+          lower = `<div class="picker"><p class="muted">Build the picture for number ${S.active + 1} of ${S.secret.length}${cls ? '. Pick one picture for every number, even if you are not sure' : ''}:</p>${rows}</div>
             <button type="button" class="btn alt" data-act="check"${all ? '' : ' disabled'}>${all ? 'Check my pictures' : 'Decode every number first'}</button>`;
         } else {
-          const n = S.secret.filter((im, i) => FEATS.every((f) => S.guess[i][f] === im[f])).length;
-          const msg = S.mode === 0
+          const n = S.secret.filter((im, i) => hit(S.guess[i], im)).length;
+          const two = S.secret.filter((im) => fits(im).length > 1).length;
+          const msg = cls
+            ? `<p><b>${two} of these numbers fit two pictures.</b> This rule gives blue and purple the same digit, so the number alone cannot tell them apart.</p><p>If you had to bet on one, which would it be? Look at the examples again: which color did your instructor use more often?</p>`
+            : S.mode === 0
             ? '<p><b>You had the rule, so decoding was a lookup.</b> A brain never hands over its rule.</p><p>Now try <b>Round 2</b>: swap roles, and this time the Encoder keeps the rule secret.</p>'
             : '<p><b>No rule this time.</b> You worked it out from <b>paired examples</b>: pictures you could see next to the numbers they produced.</p><p>Hold on to that. It is how every brain decoder is built.</p>';
-          lower = `<div class="score">${n} of ${S.secret.length} correct</div><div class="debrief">${msg}</div>
-            <button type="button" class="btn" data-act="next">${S.mode === 0 ? 'Swap roles: play Round 2 &#9656;' : 'Play again &#9656;'}</button>
+          lower = `<div class="score">${cls ? `${n} of ${S.secret.length} of your pictures fit` : `${n} of ${S.secret.length} correct`}</div><div class="debrief">${msg}</div>
+            <button type="button" class="btn" data-act="next">${cls ? 'Try again &#9656;' : S.mode === 0 ? 'Swap roles: play Round 2 &#9656;' : 'Play again &#9656;'}</button>
             <button type="button" class="link" data-act="home">&#9666; Back to the start</button>`;
         }
         return `${know}<section class="card"><h2>${S.checked ? 'Results' : 'Numbers to decode'}</h2>${S.checked ? '' : '<p class="muted">Tap a number, then build its picture below.</p>'}
-          <div class="slots">${slots}</div>${lower}</section>`;
+          <div class="${cls && S.checked ? 'rows' : 'slots'}">${slots}</div>${lower}</section>`;
       }
       function render() {
         const v = { home: vHome, join: vJoin, rule: vRule, secret: vSecret, pass: vPass, decode: vDecode }[S.view]();
@@ -318,7 +364,7 @@
         round(t) { S.round = Number(t.dataset.v); },
         'be-encoder'() { S.role = 'encoder'; S.mode = S.round - 1; freshRule(); S.view = 'rule'; },
         'be-decoder'() { S.role = 'decoder'; S.codeErr = ''; S.view = 'join'; },
-        home() { S.role = null; S.view = 'home'; },
+        home() { S.role = null; if (S.round > 2) S.round = 1; S.view = 'home'; },
         join() {
           const el = document.getElementById('code'); S.codeText = el ? el.value : '';
           const data = readCode(S.codeText);
@@ -351,19 +397,21 @@
         },
         hint() { S.hint = true; },
         check() { if (S.guess.every(slotDone)) S.checked = true; },
-        next() { S.round = S.mode === 0 ? 2 : 1; S.role = null; S.view = 'home'; },
+        next() { if (S.mode === 2) { startClass(); return; } S.round = S.mode === 0 ? 2 : 1; S.role = null; S.view = 'home'; },
+        class() { startClass(); },
       };
       app.addEventListener('click', (e) => {
         const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
         const fn = acts[t.dataset.act]; if (!fn) return;
         fn(t); render();
-        if (['be-encoder', 'be-decoder', 'lock', 'handover', 'begin', 'join', 'check', 'next', 'home'].includes(t.dataset.act)) window.scrollTo(0, 0);
+        if (['be-encoder', 'be-decoder', 'lock', 'handover', 'begin', 'join', 'check', 'next', 'home', 'class'].includes(t.dataset.act)) window.scrollTo(0, 0);
       });
       app.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'code') { acts.join(); render(); } });
 
       function route() {
         const h = location.hash.slice(1);
         if (h.startsWith('d=')) { const data = readCode(h.slice(2)); if (data) { startDecode(data); return; } S.role = 'decoder'; S.codeErr = 'That link is not a valid code.'; S.view = 'join'; return; }
+        if (h === 'round3') { startClass(); return; }
         if (h === 'decoder') { S.role = 'decoder'; S.view = 'join'; return; }
         if (h === 'encoder' || h === 'encoder2') { S.round = h === 'encoder2' ? 2 : 1; acts['be-encoder'](); return; }
       }
