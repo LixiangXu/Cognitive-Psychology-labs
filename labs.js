@@ -397,6 +397,25 @@ window.LABS = [
   },
 
   {
+    id: "encode-decode",
+    title: "Encode / Decode",
+    type: "demo",
+    folder: "Encode_Decode",
+    cover: "covers/encode-decode.jpg",
+    tags: ["Brain decoding"],
+    summary: "A two-person code game: the Encoder makes a rule that turns pictures into numbers, and the Decoder turns the numbers back into pictures. In round 2 the rule stays secret.",
+    about: [
+      "In round 1 the Decoder is handed the rule, so decoding is a simple look-up. In round 2 the Decoder gets only six example pictures with their numbers, and has to work out the rule from them before decoding three new numbers.",
+      "Reading mental content from brain activity is like round 2. The brain is the encoder and nobody hands over its rule, so a decoder has to be fitted from examples: recordings paired with what the person was seeing, hearing or doing at the time."
+    ],
+    references: [
+      { cite: "Naselaris, T., Kay, K. N., Nishimoto, S., & Gallant, J. L. (2011). Encoding and decoding in fMRI. *NeuroImage, 56*(2), 400–410.",
+        doi: "10.1016/j.neuroimage.2010.07.073" }
+    ],
+    analysis: ""
+  },
+
+  {
     id: "brain3d",
     title: "3D Brain Viewer",
     type: "tool",
